@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useTaskStore } from '../stores/useTaskStore'
-import type { Project } from '../../../shared/types'
+import type { Project, Task } from '../../../shared/types'
 
-const props = defineProps<{ projects: Project[] }>()
-const emit = defineEmits<{ submit: []; cancel: [] }>()
+const props = defineProps<{
+  projects: Project[]
+  initialTask?: Task
+  mode?: 'create' | 'edit'
+}>()
+const emit = defineEmits<{
+  submit: [changes?: Partial<Task>]
+  cancel: []
+}>()
 const taskStore = useTaskStore()
 
 const title = ref('')
@@ -12,7 +19,28 @@ const description = ref('')
 const prompt = ref('')
 const projectId = ref('')
 
+const isEdit = computed(() => props.mode === 'edit')
+
+// 编辑模式下预填充
+watch(() => props.initialTask, (t) => {
+  if (t) {
+    title.value = t.title
+    description.value = t.description ?? ''
+    prompt.value = t.prompt
+    projectId.value = t.projectId
+  }
+}, { immediate: true })
+
 async function handleSubmit() {
+  if (isEdit.value) {
+    const changes: Partial<Task> = {}
+    if (title.value !== props.initialTask!.title) changes.title = title.value
+    if (description.value !== (props.initialTask!.description ?? '')) changes.description = description.value || undefined
+    if (prompt.value !== props.initialTask!.prompt) changes.prompt = prompt.value
+    if (projectId.value !== props.initialTask!.projectId) changes.projectId = projectId.value
+    emit('submit', changes)
+    return
+  }
   const result = await taskStore.create({
     title: title.value,
     description: description.value || undefined,
@@ -39,7 +67,7 @@ async function handleSubmit() {
     <textarea v-model="description" placeholder="描述（可选）" rows="2" />
     <textarea v-model="prompt" placeholder="给 Claude Code 的 Prompt" rows="4" required />
     <div class="actions">
-      <button type="submit">创建</button>
+      <button type="submit">{{ isEdit ? '保存' : '创建' }}</button>
       <button type="button" @click="emit('cancel')">取消</button>
     </div>
   </form>

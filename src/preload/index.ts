@@ -40,6 +40,9 @@ const api = {
   updateTask: (id: string, doc: Partial<Task>) =>
     ipcRenderer.invoke('task:update', id, doc),
   deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
+
+  // === Dialog ===
+  selectDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
 }
 
 contextBridge.exposeInMainWorld('api', api)

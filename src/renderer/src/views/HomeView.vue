@@ -1,9 +1,19 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useSyncStore } from '../stores/useSyncStore'
+import { useProjectStore } from '../stores/useProjectStore'
+import { useTaskStore } from '../stores/useTaskStore'
 import { storeToRefs } from 'pinia'
 
 const store = useSyncStore()
 const { status } = storeToRefs(store)
+const projectStore = useProjectStore()
+const taskStore = useTaskStore()
+
+onMounted(() => {
+  projectStore.fetch()
+  taskStore.fetch()
+})
 
 function dotClass(phase: string): string {
   switch (phase) {
@@ -35,6 +45,7 @@ function statusText(phase: string): string {
 <template>
   <main class="home">
     <h1>ClaudeCode Remote</h1>
+
     <section class="sync-card">
       <div class="sync-header">
         <span :class="['dot', dotClass(status.phase)]" />
@@ -48,6 +59,25 @@ function statusText(phase: string): string {
         <p v-if="status.message" class="error">{{ status.message }}</p>
       </div>
       <button class="refresh-btn" @click="store.refresh">刷新连接</button>
+    </section>
+
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-value">{{ projectStore.projects.length }}</span>
+        <span class="stat-label">项目</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ taskStore.tasks.length }}</span>
+        <span class="stat-label">总任务</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ taskStore.tasks.filter((t) => t.status === 'completed').length }}</span>
+        <span class="stat-label">已完成</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ taskStore.tasks.filter((t) => t.status === 'developing').length }}</span>
+        <span class="stat-label">开发中</span>
+      </div>
     </section>
   </main>
 </template>
@@ -155,5 +185,31 @@ h1 {
 
 .refresh-btn:hover {
   background: #f3f4f6;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+.stat-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.stat-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-bottom: var(--space-xs);
+}
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-muted);
 }
 </style>

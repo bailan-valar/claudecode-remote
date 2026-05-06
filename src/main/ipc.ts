@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { syncManager } from './index'
 import { authManager } from './index'
 import { createProjectRepository } from './repositories/projectRepository'
@@ -159,5 +159,15 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const repo = createTaskRepository(db)
     await repo.delete(id)
     return { ok: true }
+  })
+
+  // --- Dialog handlers ---
+  ipcMain.removeHandler('dialog:openDirectory')
+  ipcMain.handle('dialog:openDirectory', async () => {
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory'],
+    })
+    if (result.canceled) return { ok: false }
+    return { ok: true, path: result.filePaths[0] }
   })
 }
