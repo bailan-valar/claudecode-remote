@@ -1,7 +1,8 @@
 import 'dotenv/config'
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { syncManager } from './db'
+import { SyncManager } from './db'
+import { AuthManager } from './auth'
 import { registerIpcHandlers } from './ipc'
 
 function createWindow(): BrowserWindow {
@@ -35,10 +36,25 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
+const couchBaseUrl =
+  process.env.COUCHDB_URL?.replace(/\/[^/]*$/, '') || 'http://localhost:5984'
+
+export const syncManager = new SyncManager({
+  baseUrl: couchBaseUrl,
+  adminAuth:
+    process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD
+      ? {
+          username: process.env.COUCHDB_ADMIN_USER,
+          password: process.env.COUCHDB_ADMIN_PASSWORD,
+        }
+      : undefined,
+})
+
+export const authManager = new AuthManager(couchBaseUrl)
+
 app.whenReady().then(() => {
   const win = createWindow()
   registerIpcHandlers(win)
-  syncManager.start()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
