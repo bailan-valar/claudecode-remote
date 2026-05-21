@@ -40,6 +40,7 @@ export class SyncManager extends EventEmitter {
   }
 
   async switchToUser(username: string, password: string): Promise<void> {
+    console.log('[db] switchToUser', username)
     this.stop()
 
     const localName = `cc-remote-${username}`
@@ -53,13 +54,53 @@ export class SyncManager extends EventEmitter {
 
     // Ensure remote DB exists (couch_peruser auto-creates, but fallback just in case)
     try {
-      await this.remote.info()
+      const info = await this.remote.info()
+      console.log('[db] remote info', info.db_name)
     } catch (err: any) {
-      if (err.status === 404 && this.adminAuth) {
-        const adminRemote = new PouchDB(`${this.baseUrl}/${remoteName}`, {
-          auth: this.adminAuth,
+      console.warn('[db] remote info failed:', err.status, err.message)
+      // CouchDB 对不存在的数据库可能返回 401（隐藏 404），因此无论状态码都尝试用 admin 兜底创建
+      if (this.adminAuth) {
+        const createUrl = `${this.baseUrl}/${remoteName}`
+        const auth = Buffer.from(`${this.adminAuth.username}:${this.adminAuth.password}`).toString('base64')
+        try {
+          const res = await fetch(createUrl, {
+            method: 'PUT',
+            headers: { Authorization: `Basic ${auth}` },
+          })
+          if (res.ok || res.status === 412) {
+            console.log('[db] ensured remote DB exists')
+          } else {
+            console.error('[db] ensure remote DB failed:', res.status, await res.text().catch(() => ''))
+          }
+        } catch (fetchErr: any) {
+          console.error('[db] ensure remote DB fetch failed:', fetchErr.message)
+        }
+      }
+    }
+
+    // Ensure user has access to their own remote DB (needed when admin creates it)
+    if (this.adminAuth) {
+      const securityUrl = `${this.baseUrl}/${remoteName}/_security`
+      const auth = Buffer.from(`${this.adminAuth.username}:${this.adminAuth.password}`).toString('base64')
+      try {
+        const res = await fetch(securityUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Basic ${auth}`,
+          },
+          body: JSON.stringify({
+            admins: { names: [], roles: [] },
+            members: { names: [username], roles: [] },
+          }),
         })
-        await adminRemote.info() // PUT creates DB
+        if (res.ok) {
+          console.log('[db] set security for', username)
+        } else {
+          console.warn('[db] set security failed:', res.status, await res.text().catch(() => ''))
+        }
+      } catch (secErr: any) {
+        console.warn('[db] set security fetch failed:', secErr.message)
       }
     }
 
@@ -67,6 +108,7 @@ export class SyncManager extends EventEmitter {
   }
 
   logout(): void {
+    console.log('[db] logout')
     this.stop()
     this.local = undefined
     this.remote = undefined
@@ -76,29 +118,41 @@ export class SyncManager extends EventEmitter {
 
   private start(): void {
     if (!this.local || !this.remote) return
+    console.log('[db] sync start')
     this.emit('status', { phase: 'connecting' })
     this.handle = this.local
       .sync(this.remote, { live: true, retry: true })
       .on('change', (info) => {
         const changeCount = info.change?.docs?.length ?? 0
+        console.log('[db] sync change', changeCount, 'docs')
         this.emit('status', { phase: 'active', lastChange: changeCount })
       })
-      .on('paused', () => this.emit('status', { phase: 'paused' }))
-      .on('active', () => this.emit('status', { phase: 'active' }))
-      .on('denied', (err: any) =>
-        this.emit('status', { phase: 'error', message: `denied: ${err.reason}` }),
-      )
-      .on('error', (err: any) =>
-        this.emit('status', { phase: 'error', message: String(err.message || err) }),
-      )
+      .on('paused', () => {
+        console.log('[db] sync paused')
+        this.emit('status', { phase: 'paused' })
+      })
+      .on('active', () => {
+        console.log('[db] sync active')
+        this.emit('status', { phase: 'active' })
+      })
+      .on('denied', (err: any) => {
+        console.error('[db] sync denied:', err)
+        this.emit('status', { phase: 'error', message: `denied: ${err.reason}` })
+      })
+      .on('error', (err: any) => {
+        console.error('[db] sync error:', err)
+        this.emit('status', { phase: 'error', message: String(err.message || err) })
+      })
   }
 
   private stop(): void {
+    console.log('[db] sync stop')
     this.handle?.cancel?.()
     this.handle = undefined
   }
 
   restart(): void {
+    console.log('[db] sync restart')
     this.stop()
     this.start()
   }

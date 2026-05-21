@@ -58,40 +58,75 @@ async function handleDelete() {
   <div v-if="!task" class="loading">加载中...</div>
   <div v-else class="task-detail">
     <header>
-      <StatusBadge :status="task.status" />
-      <h2 v-if="!isEditing">{{ task.title }}</h2>
+      <div class="header-left">
+        <StatusBadge :status="task.status" />
+        <h1 v-if="!isEditing" class="page-title">{{ task.title }}</h1>
+      </div>
       <div class="actions">
-        <button v-if="!isEditing" @click="isEditing = true">编辑</button>
-        <button v-else @click="isEditing = false">取消编辑</button>
-        <button class="danger" @click="showDeleteConfirm = true">删除</button>
+        <button v-if="!isEditing" class="glass-button" @click="isEditing = true">编辑</button>
+        <button v-else class="glass-button" @click="isEditing = false">取消编辑</button>
+        <button class="glass-button danger" @click="showDeleteConfirm = true">删除</button>
       </div>
     </header>
 
-    <TaskForm
-      v-if="isEditing"
-      :projects="projectStore.projects"
-      :initial-task="task"
-      mode="edit"
-      @submit="handleUpdate"
-      @cancel="isEditing = false"
-    />
+    <div v-if="isEditing" class="form-panel glass">
+      <TaskForm
+        :projects="projectStore.projects"
+        :initial-task="task"
+        mode="edit"
+        @submit="handleUpdate"
+        @cancel="isEditing = false"
+      />
+    </div>
 
-    <section v-else class="info">
-      <p><strong>描述：</strong>{{ task.description || '无' }}</p>
-      <p><strong>Prompt：</strong></p>
-      <pre>{{ task.prompt }}</pre>
-      <p>
-        <strong>所属项目：</strong>
-        {{ projectStore.projects.find((p) => p._id === task!.projectId)?.name ?? task!.projectId }}
-      </p>
-      <p><strong>优先级：</strong>{{ task.priority }}</p>
-      <p><strong>创建时间：</strong>{{ new Date(task.createdAt).toLocaleString() }}</p>
-      <p v-if="task.completedAt"><strong>完成时间：</strong>{{ new Date(task.completedAt).toLocaleString() }}</p>
+    <section v-else class="info glass">
+      <div class="info-row">
+        <span class="info-label">描述</span>
+        <span class="info-value">{{ task.description || '无' }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Prompt</span>
+        <pre class="prompt-block">{{ task.prompt }}</pre>
+      </div>
+      <div class="info-row">
+        <span class="info-label">所属项目</span>
+        <span class="info-value">
+          {{ projectStore.projects.find((p) => p._id === task!.projectId)?.name ?? task!.projectId }}
+        </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">优先级</span>
+        <span class="info-value">{{ task.priority }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">创建时间</span>
+        <span class="info-value">{{ new Date(task.createdAt).toLocaleString() }}</span>
+      </div>
+      <div v-if="task.completedAt" class="info-row">
+        <span class="info-label">完成时间</span>
+        <span class="info-value">{{ new Date(task.completedAt).toLocaleString() }}</span>
+      </div>
+    </section>
+
+    <section v-if="task.logs.length" class="logs">
+      <h2 class="section-title">执行日志</h2>
+      <div class="log-list glass">
+        <div
+          v-for="(log, idx) in task.logs"
+          :key="idx"
+          :class="['log-entry', log.level]"
+        >
+          <span class="log-time">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+          <pre class="log-message">{{ log.message }}</pre>
+        </div>
+      </div>
     </section>
 
     <section class="transitions">
-      <h3>状态流转</h3>
-      <TaskStatusActions :status="task.status" @transition="handleTransition" />
+      <h2 class="section-title">状态流转</h2>
+      <div class="transitions-panel glass">
+        <TaskStatusActions :status="task.status" @transition="handleTransition" />
+      </div>
     </section>
 
     <ConfirmDialog
@@ -105,16 +140,168 @@ async function handleDelete() {
 </template>
 
 <style scoped>
-.task-detail { padding: var(--space-lg); max-width: 800px; }
-.loading { padding: var(--space-lg); color: var(--color-muted); }
-header { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); flex-wrap: wrap; }
-header h2 { flex: 1; margin: 0; }
-.actions { display: flex; gap: var(--space-sm); }
-.info p { margin-bottom: var(--space-md); line-height: 1.6; }
-.info pre { background: #f5f5f5; padding: var(--space-sm); border-radius: var(--radius); white-space: pre-wrap; }
-.transitions { margin-top: var(--space-xl); }
-.transitions h3 { font-size: 1rem; margin-bottom: var(--space-sm); }
-button { padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); font-size: 0.875rem; cursor: pointer; }
-button.danger { border-color: var(--color-error); color: var(--color-error); }
-button:hover { background: #f3f4f6; }
+.task-detail {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.loading {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xl);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+header .page-title {
+  margin-bottom: 0;
+  font-size: 1.5rem;
+}
+
+header .actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.form-panel {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.info {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.info-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.info-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.info-value {
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.prompt-block {
+  background: rgba(0, 0, 0, 0.04);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.logs {
+  margin-top: var(--space-2xl);
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  color: var(--color-text);
+}
+
+.log-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--space-md);
+}
+
+.log-entry {
+  margin-bottom: var(--space-md);
+  font-size: 0.875rem;
+}
+
+.log-entry:last-child {
+  margin-bottom: 0;
+}
+
+.log-time {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-right: var(--space-sm);
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.log-message {
+  white-space: pre-wrap;
+  margin: 0.25rem 0 0 0;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.log-entry.error .log-message {
+  color: var(--color-error);
+}
+
+.transitions {
+  margin-top: var(--space-2xl);
+}
+
+.transitions-panel {
+  padding: var(--space-lg);
+}
+
+@media (max-width: 640px) {
+  .task-detail {
+    padding: 0;
+  }
+
+  header {
+    margin-bottom: var(--space-lg);
+  }
+
+  header .actions {
+    width: 100%;
+  }
+
+  header .actions .glass-button {
+    flex: 1;
+    min-height: 40px;
+  }
+
+  .transitions-panel :deep(.actions) {
+    flex-direction: column;
+  }
+
+  .transitions-panel :deep(.actions button) {
+    width: 100%;
+    min-height: 44px;
+  }
+}
 </style>

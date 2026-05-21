@@ -1,0 +1,178 @@
+import { spawn, type ChildProcess } from 'node:child_process'
+import type { Project, Task } from '../../shared/types'
+
+export interface RunResult {
+  success: boolean
+  result?: string
+  sessionId?: string
+  error?: string
+}
+
+export interface LogEntry {
+  timestamp: string
+  level: 'info' | 'warn' | 'error'
+  message: string
+}
+
+function buildEnv(project: Project): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  if (project.llmConfig) {
+    const { baseUrl, apiKey, model } = project.llmConfig
+    if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl
+    if (apiKey) env.ANTHROPIC_API_KEY = apiKey
+    if (model) env.ANTHROPIC_MODEL = model
+  }
+  return env
+}
+
+function buildArgs(task: Task, project: Project, resumeSessionId?: string): string[] {
+  const args: string[] = [
+    '-p',
+    '--output-format', 'stream-json',
+    '--bare',
+    '--allowedTools', project.allowedTools?.join(',') ?? 'Read,Edit,Bash',
+    '--verbose',
+  ]
+  if (resumeSessionId) {
+    args.push('--resume', resumeSessionId)
+  }
+  args.push(task.prompt)
+  return args
+}
+
+/**
+ * 运行单个 Claude Code 任务。
+ * @param onLog 实时日志回调（可选）
+ * @param abortSignal 用于取消执行
+ */
+export function runClaudeTask(
+  task: Task,
+  project: Project,
+  options?: {
+    onLog?: (entry: LogEntry) => void
+    abortSignal?: AbortSignal
+  },
+): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const resumeSessionId = task.claudeSessionId ?? undefined
+    const args = buildArgs(task, project, resumeSessionId)
+    const env = buildEnv(project)
+
+    const child = spawn('claude', args, {
+      cwd: project.path,
+      env,
+      shell: process.platform === 'win32',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    let capturedSessionId: string | undefined
+    let capturedResult: string | undefined
+    let stderrBuf = ''
+    const logBuffer: LogEntry[] = []
+    let finished = false
+
+    function finish(result: RunResult) {
+      if (finished) return
+      finished = true
+      try {
+        child.kill()
+      } catch {}
+      resolve(result)
+    }
+
+    options?.abortSignal?.addEventListener('abort', () => {
+      finish({ success: false, error: '用户取消', sessionId: capturedSessionId })
+    })
+
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      const lines = chunk.split(/\r?\n/)
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const json = JSON.parse(line)
+          // 提取 session_id
+          if (json.type === 'system' && json.session_id && !capturedSessionId) {
+            capturedSessionId = json.session_id
+          }
+          // 提取最终结果
+          if (json.type === 'result' && typeof json.result === 'string') {
+            capturedResult = json.result
+          }
+          // 实时日志
+          const msg = extractReadableMessage(json)
+          if (msg) {
+            const entry: LogEntry = {
+              timestamp: new Date().toISOString(),
+              level: json.type === 'result' && json.is_error ? 'error' : 'info',
+              message: msg,
+            }
+            logBuffer.push(entry)
+            options?.onLog?.(entry)
+          }
+        } catch {
+          const entry: LogEntry = {
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            message: line.trim(),
+          }
+          logBuffer.push(entry)
+          options?.onLog?.(entry)
+        }
+      }
+    })
+
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', (chunk: string) => {
+      stderrBuf += chunk
+      const entry: LogEntry = {
+        timestamp: new Date().toISOString(),
+        level: 'error',
+        message: chunk.trim(),
+      }
+      logBuffer.push(entry)
+      options?.onLog?.(entry)
+    })
+
+    child.on('error', (err) => {
+      finish({ success: false, error: `spawn 失败: ${err.message}`, sessionId: capturedSessionId })
+    })
+
+    child.on('close', (code) => {
+      if (finished) return
+      if (code !== 0) {
+        const errMsg = stderrBuf.trim() || `claude 进程退出码 ${code}`
+        finish({ success: false, error: errMsg, sessionId: capturedSessionId })
+        return
+      }
+      finish({
+        success: true,
+        result: capturedResult ?? '（无输出）',
+        sessionId: capturedSessionId,
+      })
+    })
+  })
+}
+
+function extractReadableMessage(json: any): string | null {
+  if (json.type === 'assistant' && json.message?.content) {
+    const parts: string[] = []
+    for (const c of json.message.content) {
+      if (c.type === 'thinking') parts.push(`[思考] ${c.thinking}`)
+      else if (c.type === 'text') parts.push(c.text)
+      else if (c.type === 'tool_use') parts.push(`[工具] ${c.name}: ${JSON.stringify(c.input)}`)
+    }
+    return parts.join('\n') || null
+  }
+  if (json.type === 'user' && json.message?.content) {
+    for (const c of json.message.content) {
+      if (c.type === 'tool_result') {
+        return `[工具结果] ${c.content ?? '(无内容)'}`
+      }
+    }
+  }
+  if (json.type === 'result') {
+    return `[完成] ${json.result ?? ''}`
+  }
+  return null
+}

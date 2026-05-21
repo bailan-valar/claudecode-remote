@@ -34,6 +34,7 @@ out
 # PouchDB local data
 cc-remote-local/
 cc-remote-local*/
+cc-remote-*/
 
 # Coverage
 coverage/

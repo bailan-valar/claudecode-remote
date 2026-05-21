@@ -6,12 +6,12 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
 <template>
   <Teleport to="body">
     <div v-if="visible" class="overlay" @click.self="emit('cancel')">
-      <div class="dialog">
+      <div class="dialog glass-strong">
         <h3>{{ title }}</h3>
         <p>{{ message }}</p>
         <div class="actions">
-          <button class="btn-danger" @click="emit('confirm')">确认</button>
-          <button class="btn-secondary" @click="emit('cancel')">取消</button>
+          <button class="glass-button danger" @click="emit('confirm')">确认</button>
+          <button class="glass-button" @click="emit('cancel')">取消</button>
         </div>
       </div>
     </div>
@@ -20,16 +20,62 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
 
 <style scoped>
 .overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-  display: flex; align-items: center; justify-content: center; z-index: 100;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
 }
+
 .dialog {
-  background: var(--color-surface); border-radius: var(--radius);
-  padding: var(--space-lg); min-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: var(--space-xl);
+  min-width: 340px;
+  max-width: 90vw;
+  animation: scaleIn 0.2s ease;
 }
-.dialog h3 { margin-bottom: var(--space-sm); font-size: 1rem; }
-.dialog p { margin-bottom: var(--space-lg); color: var(--color-muted); font-size: 0.875rem; }
-.actions { display: flex; gap: var(--space-sm); justify-content: flex-end; }
-.btn-danger { padding: var(--space-sm) var(--space-md); border: none; border-radius: var(--radius); background: var(--color-error); color: white; font-size: 0.875rem; }
-.btn-secondary { padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); font-size: 0.875rem; }
+
+.dialog h3 {
+  margin-bottom: var(--space-sm);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.dialog p {
+  margin-bottom: var(--space-xl);
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 </style>

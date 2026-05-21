@@ -10,12 +10,12 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
 }
 
 export const STATUS_COLOR: Record<TaskStatus, string> = {
-  planned: '#6b7280',
-  pending: '#2563eb',
-  developing: '#d97706',
-  reviewing: '#7c3aed',
-  completed: '#16a34a',
-  closed: '#dc2626',
+  planned: '#8e8e93',
+  pending: '#007aff',
+  developing: '#ff9f0a',
+  reviewing: '#af52de',
+  completed: '#34c759',
+  closed: '#ff3b30',
 }
 
 // 当前状态 → 允许流转到的状态列表

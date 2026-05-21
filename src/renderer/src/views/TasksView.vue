@@ -45,29 +45,33 @@ onMounted(() => {
 <template>
   <div class="tasks-page">
     <header>
-      <h2>任务</h2>
-      <button @click="showForm = true">+ 新建任务</button>
+      <h1 class="page-title">任务</h1>
+      <button class="glass-button primary" @click="showForm = true">+ 新建任务</button>
     </header>
 
-    <TaskForm
-      v-if="showForm"
-      :projects="projectStore.projects"
-      @submit="showForm = false"
-      @cancel="showForm = false"
-    />
+    <div v-if="showForm" class="form-panel glass">
+      <TaskForm
+        :projects="projectStore.projects"
+        :tasks="taskStore.tasks"
+        @submit="showForm = false"
+        @cancel="showForm = false"
+      />
+    </div>
 
-    <TaskFilters
-      :projects="projectStore.projects"
-      :selected-project-id="selectedProjectId"
-      :selected-status="selectedStatus"
-      @update-project="selectedProjectId = $event"
-      @update-status="selectedStatus = $event"
-    />
+    <div class="filters-bar">
+      <TaskFilters
+        :projects="projectStore.projects"
+        :selected-project-id="selectedProjectId"
+        :selected-status="selectedStatus"
+        @update-project="selectedProjectId = $event"
+        @update-status="selectedStatus = $event"
+      />
+    </div>
 
-    <div v-if="taskStore.isLoading">加载中...</div>
+    <div v-if="taskStore.isLoading" class="loading">加载中...</div>
     <EmptyState v-else-if="displayTasks.length === 0" message="暂无任务，点击上方按钮创建" />
     <ul v-else class="task-list">
-      <li v-for="t in displayTasks" :key="t._id" class="task-item">
+      <li v-for="t in displayTasks" :key="t._id" class="task-item glass glass-hover">
         <div class="row">
           <StatusBadge :status="t.status" />
           <RouterLink :to="{ name: 'task-detail', params: { id: t._id } }" class="title">
@@ -77,8 +81,12 @@ onMounted(() => {
         </div>
         <div class="actions">
           <TaskStatusActions :status="t.status" @transition="taskStore.updateStatus(t._id, $event)" />
-          <button class="btn-edit" @click="router.push({ name: 'task-detail', params: { id: t._id } })">编辑</button>
-          <button class="btn-delete" @click="deletingTaskId = t._id">删除</button>
+          <button class="glass-button btn-edit" @click="router.push({ name: 'task-detail', params: { id: t._id } })">
+            编辑
+          </button>
+          <button class="glass-button danger btn-delete" @click="deletingTaskId = t._id">
+            删除
+          </button>
         </div>
       </li>
     </ul>
@@ -94,15 +102,103 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.tasks-page { padding: var(--space-md); }
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md); }
-.task-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
-.task-item { border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-md); }
-.row { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); }
-.title { flex: 1; font-weight: 500; color: var(--color-text); text-decoration: none; }
-.title:hover { text-decoration: underline; }
-.project { color: var(--color-muted); font-size: 0.875rem; }
-.actions { display: flex; gap: var(--space-sm); align-items: center; flex-wrap: wrap; }
-.btn-edit, .btn-delete { padding: var(--space-xs) var(--space-sm); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); font-size: 0.75rem; cursor: pointer; }
-.btn-delete { color: var(--color-error); border-color: var(--color-error); }
+.tasks-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.form-panel {
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.filters-bar {
+  margin-bottom: var(--space-lg);
+}
+
+.loading {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.task-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.task-item {
+  padding: var(--space-lg);
+  cursor: default;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 1.0625rem;
+  color: var(--color-text);
+  text-decoration: none;
+  min-width: 0;
+  letter-spacing: -0.01em;
+}
+
+.title:hover {
+  color: var(--color-accent);
+  opacity: 1;
+}
+
+.project {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.actions .glass-button {
+  font-size: 0.8125rem;
+  padding: var(--space-xs) var(--space-md);
+  min-height: 32px;
+}
+
+@media (max-width: 640px) {
+  .task-item {
+    padding: var(--space-md);
+  }
+
+  .actions {
+    width: 100%;
+    margin-top: var(--space-sm);
+  }
+
+  .actions .glass-button {
+    font-size: 0.875rem;
+    padding: var(--space-sm) var(--space-md);
+    flex: 1;
+    min-height: 40px;
+  }
+}
 </style>

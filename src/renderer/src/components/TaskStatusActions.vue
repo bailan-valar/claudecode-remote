@@ -14,7 +14,7 @@ const nextStates = computed(() => getAllowedNext(props.status))
     <button
       v-for="s in nextStates"
       :key="s"
-      class="btn-primary"
+      class="glass-button primary"
       :disabled="disabled"
       @click="emit('transition', s)"
     >
@@ -24,16 +24,35 @@ const nextStates = computed(() => getAllowedNext(props.status))
 </template>
 
 <style scoped>
-.actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
-.btn-primary {
-  padding: var(--space-sm) var(--space-md);
-  border: none;
-  border-radius: var(--radius);
-  background: var(--color-accent);
-  color: white;
-  font-size: 0.875rem;
-  transition: opacity 0.2s;
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
-.btn-primary:hover:not(:disabled) { opacity: 0.9; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.glass-button.primary {
+  min-height: 36px;
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.glass-button.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0, 113, 227, 0.3);
+}
+
+.glass-button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .glass-button.primary {
+    min-height: 44px;
+    font-size: 1rem;
+  }
+}
 </style>

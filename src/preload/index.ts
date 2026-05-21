@@ -41,6 +41,29 @@ const api = {
     ipcRenderer.invoke('task:update', id, doc),
   deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
 
+  // === Engine ===
+  getEngineStatus: () => ipcRenderer.invoke('engine:status'),
+  startEngine: () => ipcRenderer.invoke('engine:start'),
+  stopEngine: () => ipcRenderer.invoke('engine:stop'),
+  pauseEngine: () => ipcRenderer.invoke('engine:pause'),
+  resumeEngine: () => ipcRenderer.invoke('engine:resume'),
+  setEngineConcurrency: (n: number) => ipcRenderer.invoke('engine:setConcurrency', n),
+  onEngineStatus: (cb: (status: any) => void) => {
+    const listener = (_: unknown, status: any) => cb(status)
+    ipcRenderer.on('engine:status', listener)
+    return () => ipcRenderer.off('engine:status', listener)
+  },
+  onEngineTaskCompleted: (cb: (taskId: string, result: any) => void) => {
+    const listener = (_: unknown, taskId: string, result: any) => cb(taskId, result)
+    ipcRenderer.on('engine:task:completed', listener)
+    return () => ipcRenderer.off('engine:task:completed', listener)
+  },
+  onEngineTaskFailed: (cb: (taskId: string, error: string) => void) => {
+    const listener = (_: unknown, taskId: string, error: string) => cb(taskId, error)
+    ipcRenderer.on('engine:task:failed', listener)
+    return () => ipcRenderer.off('engine:task:failed', listener)
+  },
+
   // === Dialog ===
   selectDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
 }

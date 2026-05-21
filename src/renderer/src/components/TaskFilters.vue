@@ -18,6 +18,7 @@ const emit = defineEmits<{
   <div class="filters">
     <select
       :value="selectedProjectId ?? ''"
+      class="glass-input"
       @change="emit('updateProject', ($event.target as HTMLSelectElement).value || null)"
     >
       <option value="">全部项目</option>
@@ -25,6 +26,7 @@ const emit = defineEmits<{
     </select>
     <select
       :value="selectedStatus ?? ''"
+      class="glass-input"
       @change="emit('updateStatus', (($event.target as HTMLSelectElement).value as TaskStatus) || null)"
     >
       <option value="">全部状态</option>
@@ -34,6 +36,14 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.filters { display: flex; gap: var(--space-sm); }
-.filters select { padding: var(--space-sm); font-size: 0.875rem; border-radius: var(--radius); border: 1px solid var(--color-border); }
+.filters {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.filters .glass-input {
+  width: auto;
+  min-width: 140px;
+}
 </style>

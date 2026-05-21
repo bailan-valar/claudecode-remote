@@ -32,14 +32,45 @@ export class BaseRepository<T extends BaseDoc> {
   }
 
   async update(id: string, changes: Partial<Omit<T, '_id' | '_rev'>>): Promise<T> {
-    const existing = await this.db.get(id)
-    const updated = { ...existing, ...changes, _id: id, _rev: existing._rev }
-    const result = await this.db.put(updated)
-    return { ...updated, _rev: result.rev } as T
+    let attempt = 0
+    while (true) {
+      try {
+        const existing = await this.db.get(id)
+        // 去掉 changes 中可能误传的 _rev，避免覆盖最新版本
+        const { _rev: _, ...safeChanges } = changes as any
+        const updated = { ...existing, ...safeChanges, _id: id, _rev: existing._rev }
+        const result = await this.db.put(updated)
+        console.log(`[repo:${this.type}] update ${id} ok (rev=${result.rev})`)
+        return { ...updated, _rev: result.rev } as T
+      } catch (err: any) {
+        if (err.name === 'conflict' && attempt < 2) {
+          attempt++
+          console.warn(`[repo:${this.type}] update ${id} conflict, retry ${attempt}/2`)
+          continue
+        }
+        console.error(`[repo:${this.type}] update ${id} failed:`, err.message)
+        throw err
+      }
+    }
   }
 
   async delete(id: string): Promise<void> {
-    const doc = await this.db.get(id)
-    await this.db.remove(doc)
+    let attempt = 0
+    while (true) {
+      try {
+        const doc = await this.db.get(id)
+        await this.db.remove(doc)
+        console.log(`[repo:${this.type}] delete ${id} ok`)
+        return
+      } catch (err: any) {
+        if (err.name === 'conflict' && attempt < 2) {
+          attempt++
+          console.warn(`[repo:${this.type}] delete ${id} conflict, retry ${attempt}/2`)
+          continue
+        }
+        console.error(`[repo:${this.type}] delete ${id} failed:`, err.message)
+        throw err
+      }
+    }
   }
 }
