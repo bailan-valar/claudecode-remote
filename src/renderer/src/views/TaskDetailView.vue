@@ -8,7 +8,7 @@ import TaskStatusActions from '../components/TaskStatusActions.vue'
 import TaskListItem from '../components/TaskListItem.vue'
 import TaskEditPanel from '../components/TaskEditPanel.vue'
 import TaskAppendPanel from '../components/TaskAppendPanel.vue'
-import TaskSubtaskPanel from '../components/TaskSubtaskPanel.vue'
+import TaskCreatePanel from '../components/TaskCreatePanel.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { formatDuration } from '../utils/formatDuration'
 import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
@@ -216,21 +216,10 @@ async function handleAppend(content: string) {
 }
 
 // ── 新增子任务 ──
-async function handleCreateSubtask(data: { title: string; prompt: string }) {
-  if (!task.value || !data.title.trim()) return
-  const result = await taskStore.create({
-    title: data.title.trim(),
-    prompt: data.prompt.trim(),
-    projectId: task.value.projectId,
-    parentTaskId: task.value._id,
-    claudeSessionId: task.value.claudeSessionId ?? undefined,
-    status: TASK_STATUS.PENDING,
-    kind: 'task',
-  })
-  if (result.ok) {
-    showSubtaskPanel.value = false
-    await taskStore.fetch()
-  }
+async function handleCreateSubtask(task?: Task) {
+  if (!task) return
+  showSubtaskPanel.value = false
+  await taskStore.fetch()
 }
 
 // ── 复制 Session ID ──
@@ -309,13 +298,17 @@ async function handleResume() {
       />
     </div>
 
-    <!-- 新增子任务面板 -->
-    <div v-if="showSubtaskPanel" class="form-panel glass">
-      <TaskSubtaskPanel
-        @submit="handleCreateSubtask"
-        @cancel="showSubtaskPanel = false"
-      />
-    </div>
+    <!-- 新增子任务弹框 -->
+    <TaskCreatePanel
+      v-model:visible="showSubtaskPanel"
+      :projects="projectStore.projects"
+      :tasks="taskStore.tasks"
+      :default-project-id="task?.projectId"
+      :default-parent-task-id="task?._id"
+      title="新建子任务"
+      @submit="handleCreateSubtask"
+      @cancel="showSubtaskPanel = false"
+    />
 
     <!-- 顶部 Tab -->
     <div class="tabs-bar">

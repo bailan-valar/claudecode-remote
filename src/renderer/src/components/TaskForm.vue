@@ -11,6 +11,7 @@ const props = defineProps<{
   initialTask?: Task
   mode?: 'create' | 'edit'
   defaultProjectId?: string
+  defaultParentTaskId?: string
 }>()
 const emit = defineEmits<{
   submit: [changes?: Partial<Task>]
@@ -50,6 +51,9 @@ watch(() => props.initialTask, (t) => {
     isPlan.value = t.isPlan ?? false
   } else if (props.defaultProjectId) {
     projectId.value = props.defaultProjectId
+    if (props.defaultParentTaskId) {
+      parentTaskId.value = props.defaultParentTaskId
+    }
   }
 }, { immediate: true })
 
