@@ -11,6 +11,7 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   completed: '已完成',
   closed: '已关闭',
   stopped: '已停止',
+  failed: '执行失败',
 }
 
 export const STATUS_COLOR: Record<TaskStatus, string> = {
@@ -24,6 +25,7 @@ export const STATUS_COLOR: Record<TaskStatus, string> = {
   completed: '#34c759',
   closed: '#ff3b30',
   stopped: '#ff3b30',
+  failed: '#ff3b30',
 }
 
 interface TaskLike {
@@ -53,6 +55,8 @@ export function getAllowedNext(status: TaskStatus, task?: TaskLike): TaskStatus[
       return []
     case 'stopped':
       return task?.isPlan ? [TASK_STATUS.PLAN_REQUIRED] : [TASK_STATUS.PENDING]
+    case 'failed':
+      return task?.isPlan ? [TASK_STATUS.PLANNING, TASK_STATUS.CLOSED] : [TASK_STATUS.DEVELOPING, TASK_STATUS.CLOSED]
     default:
       return []
   }

@@ -14,6 +14,7 @@ export const TASK_STATUS = {
   COMPLETED: 'completed',
   CLOSED: 'closed',
   STOPPED: 'stopped',
+  FAILED: 'failed',
 } as const
 
 export const TASK_PRIORITY = {
