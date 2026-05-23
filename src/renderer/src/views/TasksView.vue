@@ -195,16 +195,16 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .form-panel {
-  padding: var(--space-lg);
-  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
 .filters-bar {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .loading {

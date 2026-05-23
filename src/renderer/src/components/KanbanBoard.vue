@@ -121,23 +121,23 @@ function taskDuration(task: Task) {
 <style scoped>
 .kanban {
   display: flex;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   overflow-x: auto;
-  padding-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
   min-height: 400px;
 }
 
 .kanban-column {
-  flex: 0 0 280px;
+  flex: 0 0 240px;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 260px);
+  max-height: calc(100vh - 200px);
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(16px) saturate(1.6);
   -webkit-backdrop-filter: blur(16px) saturate(1.6);
   border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
   transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
@@ -149,11 +149,11 @@ function taskDuration(task: Task) {
 .column-header {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
   font-weight: 600;
-  font-size: 0.9375rem;
-  padding-bottom: var(--space-sm);
+  font-size: 0.8125rem;
+  padding-bottom: var(--space-xs);
   border-bottom: 1px solid var(--glass-border-subtle);
 }
 
@@ -176,15 +176,16 @@ function taskDuration(task: Task) {
 .column-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   overflow-y: auto;
   flex: 1;
 }
 
 .kanban-card {
-  padding: var(--space-md);
+  padding: var(--space-sm);
   cursor: grab;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
 .kanban-card:active {
@@ -198,12 +199,12 @@ function taskDuration(task: Task) {
 
 .card-title {
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   color: var(--color-text);
   text-decoration: none;
   display: block;
-  margin-bottom: var(--space-sm);
-  line-height: 1.4;
+  margin-bottom: var(--space-xs);
+  line-height: 1.35;
 }
 
 .card-title:hover {
@@ -211,21 +212,21 @@ function taskDuration(task: Task) {
 }
 
 .card-meta {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 
 .kind {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-text-secondary);
   background: rgba(0, 0, 0, 0.04);
-  padding: 1px 6px;
+  padding: 0px 5px;
   border-radius: var(--radius-full);
   border: 1px solid var(--glass-border-subtle);
 }
@@ -255,25 +256,28 @@ function taskDuration(task: Task) {
   50% { opacity: 0.4; }
 }
 
-.card-actions {
+ .card-actions {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .card-actions .glass-button {
-  font-size: 0.75rem;
-  padding: var(--space-xs) var(--space-sm);
-  min-height: 28px;
+  font-size: 0.6875rem;
+  padding: 2px var(--space-sm);
+  min-height: 24px;
   flex: 1;
 }
 
 @media (max-width: 640px) {
   .kanban {
-    gap: var(--space-sm);
+    gap: var(--space-xs);
   }
   .kanban-column {
-    flex: 0 0 260px;
-    padding: var(--space-sm);
+    flex: 0 0 220px;
+    padding: var(--space-xs);
+  }
+  .kanban-card {
+    padding: var(--space-xs);
   }
 }
 </style>
