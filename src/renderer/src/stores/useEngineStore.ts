@@ -7,6 +7,7 @@ export interface EngineStatus {
   queueSize: number
   currentTaskIds: string[]
   concurrency: number
+  provider: string
 }
 
 export const useEngineStore = defineStore('engine', () => {
@@ -16,7 +17,10 @@ export const useEngineStore = defineStore('engine', () => {
     queueSize: 0,
     currentTaskIds: [],
     concurrency: 1,
+    provider: 'anthropic',
   })
+
+  const providers = ref<Array<{ provider: string; name: string }>>([])
 
   let unsubStatus: (() => void) | null = null
   let unsubCompleted: (() => void) | null = null
@@ -27,6 +31,28 @@ export const useEngineStore = defineStore('engine', () => {
     if (result.ok && result.status) {
       status.value = result.status
     }
+  }
+
+  async function fetchProviders() {
+    const result = await window.api.listEngineProviders()
+    if (result.ok && result.providers) {
+      providers.value = result.providers
+    }
+  }
+
+  async function fetchProvider() {
+    const result = await window.api.getEngineProvider()
+    if (result.ok && result.provider) {
+      status.value.provider = result.provider
+    }
+  }
+
+  async function setProvider(name: string) {
+    const result = await window.api.setEngineProvider(name)
+    if (result.ok) {
+      status.value.provider = name
+    }
+    return result
   }
 
   async function start() {
@@ -82,6 +108,8 @@ export const useEngineStore = defineStore('engine', () => {
 
   onMounted(() => {
     fetchStatus()
+    fetchProviders()
+    fetchProvider()
     listen()
   })
 
@@ -89,5 +117,5 @@ export const useEngineStore = defineStore('engine', () => {
     unlisten()
   })
 
-  return { status, fetchStatus, start, stop, pause, resume, setConcurrency, listen, unlisten }
+  return { status, providers, fetchStatus, fetchProviders, fetchProvider, setProvider, start, stop, pause, resume, setConcurrency, listen, unlisten }
 })
