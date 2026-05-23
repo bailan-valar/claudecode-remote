@@ -6,13 +6,9 @@ import { useProjectStore } from '../stores/useProjectStore'
 import TaskForm from '../components/TaskForm.vue'
 import TaskFilters from '../components/TaskFilters.vue'
 import KanbanBoard from '../components/KanbanBoard.vue'
-import StatusBadge from '../components/StatusBadge.vue'
-import TaskStatusActions from '../components/TaskStatusActions.vue'
+import TaskListItem from '../components/TaskListItem.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { formatDurationShort } from '../utils/formatDuration'
-import { calculateLiveDuration, isTracking } from '../utils/timeTracking'
-import { KIND_LABEL } from '../../../shared/constants'
 import type { TaskStatus } from '../../../shared/constants'
 
 const router = useRouter()
@@ -66,12 +62,6 @@ function stopTick() {
     clearInterval(timerId)
     timerId = null
   }
-}
-
-function taskDuration(t: typeof taskStore.tasks[number]) {
-  // 依赖 tick 以便每秒重新计算正在计时的任务
-  void tick.value
-  return calculateLiveDuration(t)
 }
 
 onMounted(() => {
@@ -145,29 +135,16 @@ onUnmounted(() => {
         @delete="deletingTaskId = $event"
       />
       <ul v-else class="task-list">
-        <li v-for="t in displayTasks" :key="t._id" class="task-item glass glass-hover">
-          <div class="row">
-            <StatusBadge :status="t.status" />
-            <span class="kind-badge">{{ KIND_LABEL[t.kind] ?? t.kind ?? '任务' }}</span>
-            <RouterLink :to="{ name: 'task-detail', params: { id: t._id } }" class="title">
-              {{ t.title }}
-            </RouterLink>
-            <span class="project">{{ projectNameMap.get(t.projectId) ?? t.projectId }}</span>
-            <span v-if="(t.totalDuration ?? 0) > 0 || isTracking(t)" class="duration" :class="{ 'duration-active': isTracking(t) }">
-              {{ formatDurationShort(taskDuration(t)) }}
-              <span v-if="isTracking(t)" class="tracking-dot">●</span>
-            </span>
-          </div>
-          <div class="actions">
-            <TaskStatusActions :status="t.status" @transition="taskStore.updateStatus(t._id, $event)" />
-            <button class="glass-button btn-edit" @click="router.push({ name: 'task-detail', params: { id: t._id } })">
-              编辑
-            </button>
-            <button class="glass-button danger btn-delete" @click="deletingTaskId = t._id">
-              删除
-            </button>
-          </div>
-        </li>
+        <TaskListItem
+          v-for="t in displayTasks"
+          :key="t._id"
+          :task="t"
+          :project-name="projectNameMap.get(t.projectId) ?? t.projectId"
+          :tick="tick"
+          @transition="taskStore.updateStatus(t._id, $event)"
+          @edit="router.push({ name: 'task-detail', params: { id: $event } })"
+          @delete="deletingTaskId = $event"
+        />
       </ul>
     </template>
 
@@ -221,91 +198,6 @@ header {
   gap: var(--space-md);
 }
 
-.task-item {
-  padding: var(--space-lg);
-  cursor: default;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.title {
-  flex: 1;
-  font-weight: 600;
-  font-size: 1.0625rem;
-  color: var(--color-text);
-  text-decoration: none;
-  min-width: 0;
-  letter-spacing: -0.01em;
-}
-
-.title:hover {
-  color: var(--color-accent);
-  opacity: 1;
-}
-
-.kind-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: rgba(0, 0, 0, 0.05);
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  white-space: nowrap;
-  border: 1px solid var(--glass-border-subtle);
-}
-
-.project {
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.duration {
-  font-family: 'SF Mono', Monaco, monospace;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  background: rgba(0, 0, 0, 0.04);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
-
-.duration-active {
-  color: var(--color-accent, #007aff);
-  background: rgba(0, 122, 255, 0.08);
-  font-weight: 600;
-}
-
-.tracking-dot {
-  color: #34c759;
-  margin-left: 2px;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.actions {
-  display: flex;
-  gap: var(--space-sm);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.actions .glass-button {
-  font-size: 0.8125rem;
-  padding: var(--space-xs) var(--space-md);
-  min-height: 32px;
-}
-
 .header-actions {
   display: flex;
   gap: var(--space-md);
@@ -328,22 +220,6 @@ header {
 }
 
 @media (max-width: 640px) {
-  .task-item {
-    padding: var(--space-md);
-  }
-
-  .actions {
-    width: 100%;
-    margin-top: var(--space-sm);
-  }
-
-  .actions .glass-button {
-    font-size: 0.875rem;
-    padding: var(--space-sm) var(--space-md);
-    flex: 1;
-    min-height: 40px;
-  }
-
   .header-actions {
     gap: var(--space-sm);
   }

@@ -5,6 +5,7 @@ import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
 import StatusBadge from '../components/StatusBadge.vue'
 import TaskStatusActions from '../components/TaskStatusActions.vue'
+import TaskListItem from '../components/TaskListItem.vue'
 import TaskForm from '../components/TaskForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { formatDuration } from '../utils/formatDuration'
@@ -307,14 +308,12 @@ async function handleCreateSubtask() {
     <section v-if="childTasks.length" class="child-tasks">
       <h2 class="section-title">子任务</h2>
       <ul class="child-task-list">
-        <li v-for="ct in childTasks" :key="ct._id" class="child-task-item glass">
-          <div class="child-task-row">
-            <StatusBadge :status="ct.status" />
-            <RouterLink :to="{ name: 'task-detail', params: { id: ct._id } }" class="child-task-title">
-              {{ ct.title }}
-            </RouterLink>
-          </div>
-        </li>
+        <TaskListItem
+          v-for="ct in childTasks"
+          :key="ct._id"
+          mode="compact"
+          :task="ct"
+        />
       </ul>
     </section>
 
@@ -570,27 +569,6 @@ header .actions {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-}
-
-.child-task-item {
-  padding: var(--space-md);
-}
-
-.child-task-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.child-task-title {
-  font-weight: 600;
-  font-size: 0.9375rem;
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-.child-task-title:hover {
-  color: var(--color-accent);
 }
 
 @media (max-width: 640px) {

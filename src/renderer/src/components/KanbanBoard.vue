@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
-import { TASK_STATUS, type TaskStatus, KIND_LABEL } from '../../../shared/constants'
+import { TASK_STATUS, type TaskStatus } from '../../../shared/constants'
 import type { Task } from '../../../shared/types'
 import { STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
-import { formatDurationShort } from '../utils/formatDuration'
-import { calculateLiveDuration, isTracking } from '../utils/timeTracking'
+import TaskListItem from './TaskListItem.vue'
 
 const props = defineProps<{
   tasks: Task[]
@@ -33,14 +31,7 @@ function onDragStart(e: DragEvent, taskId: string) {
   if (e.dataTransfer) {
     e.dataTransfer.setData('text/plain', taskId)
     e.dataTransfer.effectAllowed = 'move'
-    const card = e.target as HTMLElement
-    card.classList.add('dragging')
   }
-}
-
-function onDragEnd(e: DragEvent) {
-  const card = e.target as HTMLElement
-  card.classList.remove('dragging')
 }
 
 function onDragOver(e: DragEvent) {
@@ -66,11 +57,6 @@ function onDrop(e: DragEvent, status: TaskStatus) {
     emit('move', taskId, status)
   }
 }
-
-function taskDuration(task: Task) {
-  void props.tick
-  return calculateLiveDuration(task)
-}
 </script>
 
 <template>
@@ -89,30 +75,18 @@ function taskDuration(task: Task) {
         <span class="count">{{ grouped[status].length }}</span>
       </div>
       <div class="column-body">
-        <div
+        <TaskListItem
           v-for="task in grouped[status]"
           :key="task._id"
-          class="kanban-card glass"
-          draggable="true"
-          @dragstart="onDragStart($event, task._id)"
-          @dragend="onDragEnd"
-        >
-          <RouterLink :to="{ name: 'task-detail', params: { id: task._id } }" class="card-title">
-            {{ task.title }}
-          </RouterLink>
-          <div class="card-meta">
-            <span class="kind">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
-            <span class="project">{{ projectNameMap.get(task.projectId) ?? task.projectId }}</span>
-            <span v-if="(task.totalDuration ?? 0) > 0 || isTracking(task)" class="duration" :class="{ 'duration-active': isTracking(task) }">
-              {{ formatDurationShort(taskDuration(task)) }}
-              <span v-if="isTracking(task)" class="tracking-dot">●</span>
-            </span>
-          </div>
-          <div class="card-actions">
-            <button class="glass-button btn-edit" @click="emit('edit', task._id)">编辑</button>
-            <button class="glass-button danger btn-delete" @click="emit('delete', task._id)">删除</button>
-          </div>
-        </div>
+          mode="kanban"
+          :task="task"
+          :project-name="projectNameMap.get(task.projectId) ?? task.projectId"
+          :tick="tick"
+          :draggable="true"
+          @dragstart="onDragStart"
+          @edit="emit('edit', $event)"
+          @delete="emit('delete', $event)"
+        />
       </div>
     </div>
   </div>
@@ -181,102 +155,12 @@ function taskDuration(task: Task) {
   flex: 1;
 }
 
-.kanban-card {
-  padding: var(--space-sm);
-  cursor: grab;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  border-radius: var(--radius-sm);
-}
-
-.kanban-card:active {
-  cursor: grabbing;
-}
-
-.kanban-card.dragging {
-  opacity: 0.5;
-  transform: scale(0.98);
-}
-
-.card-title {
-  font-weight: 600;
-  font-size: 0.8125rem;
-  color: var(--color-text);
-  text-decoration: none;
-  display: block;
-  margin-bottom: var(--space-xs);
-  line-height: 1.35;
-}
-
-.card-title:hover {
-  color: var(--color-accent);
-}
-
-.card-meta {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-xs);
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  flex-wrap: wrap;
-}
-
-.kind {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: rgba(0, 0, 0, 0.04);
-  padding: 0px 5px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--glass-border-subtle);
-}
-
-.duration {
-  font-family: 'SF Mono', Monaco, monospace;
-  background: rgba(0, 0, 0, 0.04);
-  padding: 1px 5px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
-
-.duration-active {
-  color: var(--color-accent, #007aff);
-  background: rgba(0, 122, 255, 0.08);
-  font-weight: 600;
-}
-
-.tracking-dot {
-  color: #34c759;
-  margin-left: 1px;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
- .card-actions {
-  display: flex;
-  gap: var(--space-xs);
-}
-
-.card-actions .glass-button {
-  font-size: 0.6875rem;
-  padding: 2px var(--space-sm);
-  min-height: 24px;
-  flex: 1;
-}
-
 @media (max-width: 640px) {
   .kanban {
     gap: var(--space-xs);
   }
   .kanban-column {
     flex: 0 0 220px;
-    padding: var(--space-xs);
-  }
-  .kanban-card {
     padding: var(--space-xs);
   }
 }
