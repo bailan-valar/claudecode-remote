@@ -14,14 +14,14 @@ const props = defineProps<{
 const dialogTitle = computed(() => props.title || '新建任务')
 
 const emit = defineEmits<{
-  submit: [task?: Task]
+  submit: [changes?: Partial<Task>]
   cancel: []
 }>()
 
 const isVisible = defineModel<boolean>('visible', { default: false })
 
-function handleSubmit(task?: Task) {
-  emit('submit', task)
+function handleSubmit(changes?: Partial<Task>) {
+  emit('submit', changes)
   isVisible.value = false
 }
 

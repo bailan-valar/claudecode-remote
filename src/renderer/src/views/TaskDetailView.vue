@@ -222,8 +222,8 @@ async function handleAppend(content: string) {
 }
 
 // ── 新增子任务 ──
-async function handleCreateSubtask(task?: Task) {
-  if (!task) return
+async function handleCreateSubtask(changes?: Partial<Task>) {
+  // 子任务创建完成，刷新列表
   showSubtaskPanel.value = false
   await taskStore.fetch()
 }
