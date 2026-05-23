@@ -2,6 +2,8 @@
 import { ref, watch, computed } from 'vue'
 import { useTaskStore } from '../stores/useTaskStore'
 import type { Project, Task } from '../../../shared/types'
+import { TASK_STATUS } from '../../../shared/constants'
+import { STATUS_LABEL } from '../utils/taskTransitions'
 
 const props = defineProps<{
   projects: Project[]
@@ -21,6 +23,7 @@ const description = ref('')
 const prompt = ref('')
 const projectId = ref('')
 const parentTaskId = ref<string | null>(null)
+const status = ref<Task['status']>('planned')
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -40,6 +43,7 @@ watch(() => props.initialTask, (t) => {
     prompt.value = t.prompt
     projectId.value = t.projectId
     parentTaskId.value = t.parentTaskId ?? null
+    status.value = t.status
   } else if (props.defaultProjectId) {
     projectId.value = props.defaultProjectId
   }
@@ -53,6 +57,7 @@ async function handleSubmit() {
     if (prompt.value !== props.initialTask!.prompt) changes.prompt = prompt.value
     if (projectId.value !== props.initialTask!.projectId) changes.projectId = projectId.value
     if (parentTaskId.value !== props.initialTask!.parentTaskId) changes.parentTaskId = parentTaskId.value
+    if (status.value !== props.initialTask!.status) changes.status = status.value
     emit('submit', changes)
     return
   }
@@ -62,6 +67,7 @@ async function handleSubmit() {
     prompt: prompt.value || title.value,
     projectId: projectId.value,
     parentTaskId: parentTaskId.value ?? undefined,
+    status: status.value,
   })
   if (result.ok) {
     title.value = ''
@@ -69,6 +75,7 @@ async function handleSubmit() {
     prompt.value = ''
     projectId.value = ''
     parentTaskId.value = null
+    status.value = 'planned'
     emit('submit')
   }
 }
@@ -84,6 +91,9 @@ async function handleSubmit() {
     <select v-if="eligibleParentTasks.length" v-model="parentTaskId" class="glass-input">
       <option :value="null">无父任务</option>
       <option v-for="t in eligibleParentTasks" :key="t._id" :value="t._id">{{ t.title }}</option>
+    </select>
+    <select v-model="status" class="glass-input" required>
+      <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
     </select>
     <textarea v-model="description" class="glass-input" placeholder="描述（可选）" rows="2" />
     <textarea v-model="prompt" class="glass-input" placeholder="给 Claude Code 的 Prompt" rows="4" required />

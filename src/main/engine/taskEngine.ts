@@ -18,11 +18,13 @@ export interface EngineStatus {
   queueSize: number
   currentTaskIds: string[]
   concurrency: number
+  provider: string
 }
 
 export interface EngineOptions {
   db: PouchDB.Database
   concurrency?: number
+  provider?: string
 }
 
 /**
@@ -36,12 +38,14 @@ export class TaskEngine extends EventEmitter {
   private changesFeed?: PouchDB.Core.Changes<{}>
   private _running = false
   private _concurrency: number
+  private _provider?: string
   private projectLocks = new Map<string, Promise<void>>()
 
   constructor(options: EngineOptions) {
     super()
     this.db = options.db
     this._concurrency = options.concurrency ?? 1
+    this._provider = options.provider
     this.queue = new PQueue({ concurrency: this._concurrency })
 
     this.queue.on('active', () => this.emit('status', this.getStatus()))
@@ -67,6 +71,15 @@ export class TaskEngine extends EventEmitter {
     this.emit('status', this.getStatus())
   }
 
+  getProvider(): string {
+    return this._provider ?? 'anthropic'
+  }
+
+  setProvider(name: string): void {
+    this._provider = name
+    this.emit('status', this.getStatus())
+  }
+
   getStatus(): EngineStatus {
     return {
       running: this._running,
@@ -74,6 +87,7 @@ export class TaskEngine extends EventEmitter {
       queueSize: this.queue.size + this.queue.pending,
       currentTaskIds: Array.from(this.runningTasks.keys()),
       concurrency: this._concurrency,
+      provider: this.getProvider(),
     }
   }
 
@@ -213,9 +227,9 @@ export class TaskEngine extends EventEmitter {
     const taskWithSession: Task = { ...task, claudeSessionId: inheritedSessionId }
 
     try {
-      const runner = getRunner(project.llmConfig?.provider)
-      console.log(`[engine] 使用执行引擎: ${runner.name} (provider=${project.llmConfig?.provider ?? 'anthropic'})`)
-      const result = await runner.runTask(taskWithSession, project, {
+      const runner = getRunner(this._provider ?? project.llmConfig?.provider)
+      console.log(`[engine] 使用执行引擎: ${runner.name} (provider=${this._provider ?? project.llmConfig?.provider ?? 'anthropic'})`)
+      const result = await runner.run(taskWithSession, project, {
         onLog: (entry) => {
           logs.push(entry)
           this._throttledLogWrite(task._id, logs)

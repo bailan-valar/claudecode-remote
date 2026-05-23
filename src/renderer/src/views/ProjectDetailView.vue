@@ -20,11 +20,36 @@ const project = ref<Project | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const showCreateTask = ref(false)
+const tick = ref(0)
+let timerId: ReturnType<typeof setInterval> | null = null
+
+function startTick() {
+  timerId = setInterval(() => {
+    tick.value++
+  }, 1000)
+}
+
+function stopTick() {
+  if (timerId) {
+    clearInterval(timerId)
+    timerId = null
+  }
+}
+
+function taskDuration(t: typeof taskStore.filteredTasks[number]) {
+  void tick.value
+  return calculateLiveDuration(t)
+}
 
 onMounted(() => {
   project.value = projectStore.projects.find((p) => p._id === projectId)
   if (!project.value) projectStore.fetch()
   taskStore.fetch(projectId)
+  startTick()
+})
+
+onUnmounted(() => {
+  stopTick()
 })
 
 watch(
@@ -138,7 +163,13 @@ async function handleTaskCreated() {
           <RouterLink :to="{ name: 'task-detail', params: { id: t._id } }" class="task-link">
             {{ t.title }}
           </RouterLink>
-          <span class="status">{{ t.status }}</span>
+          <div class="task-meta">
+            <span v-if="(t.totalDuration ?? 0) > 0 || isTracking(t)" class="duration" :class="{ 'duration-active': isTracking(t) }">
+              {{ formatDurationShort(taskDuration(t)) }}
+              <span v-if="isTracking(t)" class="tracking-dot">●</span>
+            </span>
+            <span class="status">{{ t.status }}</span>
+          </div>
         </li>
       </ul>
       <p v-else class="empty">该项目暂无任务</p>
@@ -254,16 +285,52 @@ header .actions {
   justify-content: space-between;
   align-items: center;
   padding: var(--space-md) var(--space-lg);
+  gap: var(--space-sm);
 }
 
 .task-link {
   font-weight: 500;
   color: var(--color-text);
+  flex: 1;
+  min-width: 0;
 }
 
 .task-link:hover {
   color: var(--color-accent);
   opacity: 1;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.duration {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.duration-active {
+  color: var(--color-accent, #007aff);
+  background: rgba(0, 122, 255, 0.08);
+  font-weight: 600;
+}
+
+.tracking-dot {
+  color: #34c759;
+  margin-left: 1px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .status {

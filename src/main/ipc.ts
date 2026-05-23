@@ -5,6 +5,7 @@ import { createProjectRepository } from './repositories/projectRepository'
 import { createTaskRepository } from './repositories/taskRepository'
 import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState, saveEngineState } from './engineState'
+import { listRunners } from './engine/runnerRegistry'
 import { computeTimeTrackingChanges } from './utils/taskTimeTracking'
 
 export function registerIpcHandlers(win: BrowserWindow) {
@@ -47,8 +48,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
       // 启动引擎
       const db = syncManager.getLocalDb()
       if (db) {
-        getEngine()?.stop?.()
-        const engine = new TaskEngine({ db, concurrency: 1 })
+        const oldEngine = getEngine()
+        const provider = oldEngine?.getProvider?.() ?? loadEngineState().provider
+        oldEngine?.stop?.()
+        const engine = new TaskEngine({ db, concurrency: 1, provider })
         engine.on('status', (status) => {
           if (!win.isDestroyed()) {
             win.webContents.send('engine:status', status)
@@ -245,7 +248,7 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const db = syncManager.getLocalDb()
     if (!db) return { ok: false, error: '未登录' }
     const state = loadEngineState()
-    const newEngine = new TaskEngine({ db, concurrency: state.concurrency ?? 1 })
+    const newEngine = new TaskEngine({ db, concurrency: state.concurrency ?? 1, provider: state.provider })
     newEngine.on('status', (status) => {
       if (!win.isDestroyed()) {
         win.webContents.send('engine:status', status)
