@@ -307,6 +307,26 @@ header .actions {
   50% { opacity: 0.4; }
 }
 
+.status-editable {
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.status-editable:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.status-select {
+  width: auto;
+  min-width: 120px;
+  font-size: 0.8125rem;
+  padding: 0.35rem 0.75rem;
+  height: auto;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+}
+
 .prompt-block {
   background: rgba(0, 0, 0, 0.04);
   padding: var(--space-md);
