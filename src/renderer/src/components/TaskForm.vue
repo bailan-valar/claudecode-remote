@@ -55,8 +55,8 @@ watch(() => props.initialTask, (t) => {
 
 watch(kind, (newKind, oldKind) => {
   if (!isEdit.value && newKind === 'epic' && oldKind !== 'epic') {
+    // 仅在从非史诗切换到史诗时，默认勾选 plan
     isPlan.value = true
-    if (!isEdit.value) status.value = 'plan_required'
   }
 })
 
