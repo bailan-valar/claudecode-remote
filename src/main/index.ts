@@ -7,6 +7,7 @@ import { registerIpcHandlers } from './ipc'
 import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState } from './engineState'
 import { broadcast } from './events'
+import { getSessionAction } from './apiActions'
 
 let engine: TaskEngine | null = null
 
@@ -91,6 +92,16 @@ export const authManager = new AuthManager({
 app.whenReady().then(async () => {
   const win = createWindow()
   registerIpcHandlers(win)
+
+  // 尝试从本地加密存储恢复登录态
+  try {
+    const sessionResult = await getSessionAction()
+    if (sessionResult.user) {
+      console.log('[main] auto-login restored:', sessionResult.user.username)
+    }
+  } catch (err: any) {
+    console.error('[main] auto-login failed:', err.message)
+  }
 
   // 启动 Web 服务器
   try {

@@ -9,6 +9,7 @@ import type { TimeEntry } from './utils/taskTimeTracking'
 import { broadcast } from './events'
 import { sendWecomMessage, buildTestMessage } from './engine/wecomNotifier'
 import { runClaudeChat } from './engine/claudeRunner'
+import { saveCredentials, loadCredentials, clearCredentials } from './credentialStore'
 import type { Project, Task } from '../shared/types'
 import type { LogEntry } from './engine/runner'
 
@@ -53,6 +54,7 @@ export async function loginAction(username: string, password: string) {
         engine.start()
       }
     }
+    saveCredentials(username, password)
     console.log('[api] auth:login ok')
     return { ok: true, user }
   } catch (err: any) {
@@ -68,6 +70,7 @@ export async function logoutAction() {
     setEngine(null)
     await authManager.logOut()
     syncManager.logout()
+    clearCredentials()
     console.log('[api] auth:logout ok')
     return { ok: true }
   } catch (err: any) {
@@ -78,7 +81,17 @@ export async function logoutAction() {
 
 export async function getSessionAction() {
   try {
-    const user = await authManager.getSession()
+    let user = await authManager.getSession()
+    if (!user) {
+      const creds = loadCredentials()
+      if (creds) {
+        console.log('[api] auto-login with stored credentials')
+        const result = await loginAction(creds.username, creds.password)
+        if (result.ok && result.user) {
+          user = result.user
+        }
+      }
+    }
     return { user }
   } catch (err: any) {
     console.error('[api] getSession failed:', err.message)
