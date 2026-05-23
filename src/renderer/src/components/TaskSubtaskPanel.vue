@@ -2,12 +2,12 @@
 import { ref, computed } from 'vue'
 
 const emit = defineEmits<{
-  submit: [data: { title: string; prompt: string }]
+  submit: [data: { title: string; description?: string }]
   cancel: []
 }>()
 
 const title = ref('')
-const prompt = ref('')
+const description = ref('')
 
 const canSubmit = computed(() => !!title.value.trim())
 
@@ -15,15 +15,15 @@ function handleSubmit() {
   if (!canSubmit.value) return
   emit('submit', {
     title: title.value.trim(),
-    prompt: prompt.value.trim() || title.value.trim(),
+    description: description.value.trim() || undefined,
   })
   title.value = ''
-  prompt.value = ''
+  description.value = ''
 }
 
 function handleCancel() {
   title.value = ''
-  prompt.value = ''
+  description.value = ''
   emit('cancel')
 }
 </script>
@@ -39,9 +39,9 @@ function handleCancel() {
       required
     />
     <textarea
-      v-model="prompt"
+      v-model="description"
       class="glass-input"
-      placeholder="给 Claude Code 的 Prompt（可选，默认使用标题）"
+      placeholder="子任务描述（可选）"
       rows="4"
     />
     <div class="panel-actions">

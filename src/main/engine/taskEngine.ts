@@ -309,10 +309,12 @@ export class TaskEngine extends EventEmitter {
     this.emit('status', this.getStatus())
 
     const logs: LogEntry[] = [...(task.logs ?? [])]
+
     const taskWithSession: Task = {
       ...task,
       claudeSessionId: inheritedSessionId,
-      prompt: latestTask.prompt || latestTask.title,
+      title: latestTask.title,
+      description: latestTask.description,
     }
 
     try {
@@ -385,7 +387,7 @@ export class TaskEngine extends EventEmitter {
             taskTitle: task.title,
             taskId: task._id,
             status: statusLabel,
-            prompt: task.prompt ?? '',
+            taskDescription: task.description,
             logsCount: logs.length,
             commitMessage: undefined,
             durationMs: totalSec * 1000,
@@ -465,7 +467,7 @@ export class TaskEngine extends EventEmitter {
               projectName: project.name,
               taskTitle: task.title,
               taskId: task._id,
-              prompt: task.prompt ?? '',
+              taskDescription: task.description,
               error: result.error ?? '执行失败',
               durationMs: totalSec * 1000,
               taskUrl: buildTaskUrl(project, task._id),
@@ -513,7 +515,7 @@ export class TaskEngine extends EventEmitter {
           projectName: project.name,
           taskTitle: task.title,
           taskId: task._id,
-          prompt: task.prompt ?? '',
+          taskDescription: task.description,
           error: wasStopped ? '任务已停止' : `异常: ${err.message}`,
           durationMs: totalSec * 1000,
           taskUrl: buildTaskUrl(project, task._id),

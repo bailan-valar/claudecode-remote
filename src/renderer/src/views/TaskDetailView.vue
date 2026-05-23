@@ -205,9 +205,12 @@ async function handleDelete() {
 // ── 追加任务 ──
 async function handleAppend(content: string) {
   if (!task.value || !content.trim()) return
-  const newPrompt = (task.value.prompt || '') + '\n\n--- 追加 ---\n' + content.trim()
+  // 追加内容到描述字段
+  const newDescription = task.value.description
+    ? task.value.description + '\n\n--- 追加 ---\n' + content.trim()
+    : content.trim()
   const result = await taskStore.update(task.value._id, {
-    prompt: newPrompt,
+    description: newDescription,
     status: TASK_STATUS.PENDING,
     reviewFeedback: undefined,
     completedAt: null,
@@ -394,11 +397,6 @@ watch(() => task.value?.logs, () => {
       <div class="info-row">
         <span class="info-label">描述</span>
         <span class="info-value">{{ task.description || '无' }}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Prompt</span>
-        <pre v-if="task.prompt" class="prompt-block">{{ task.prompt }}</pre>
-        <span v-else class="info-value">（空，执行时将使用标题）</span>
       </div>
       <div class="info-row">
         <span class="info-label">所属项目</span>
@@ -671,18 +669,6 @@ header .actions {
   height: auto;
   border-radius: var(--radius-full);
   font-weight: 600;
-}
-
-.prompt-block {
-  background: rgba(0, 0, 0, 0.04);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  white-space: pre-wrap;
-  overflow-x: auto;
-  font-family: 'SF Mono', Monaco, monospace;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  border: 1px solid var(--glass-border-subtle);
 }
 
 .section-title {

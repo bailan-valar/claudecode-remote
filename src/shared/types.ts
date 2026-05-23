@@ -40,7 +40,6 @@ export interface Task extends BaseDoc {
   parentTaskId?: string | null
   title: string
   description?: string
-  prompt?: string
   status: TaskStatus
   priority: TaskPriority
   kind: TaskKind

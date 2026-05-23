@@ -59,7 +59,7 @@ export function buildTaskCompletedMarkdown(opts: {
   taskTitle: string
   taskId: string
   status: string
-  prompt: string
+  taskDescription?: string
   logsCount: number
   commitMessage?: string
   durationMs?: number
@@ -72,6 +72,11 @@ export function buildTaskCompletedMarkdown(opts: {
   // 处理任务标题显示：超过8个字则截断为「XXXXXXXX…」
   const displayTitle = opts.taskTitle.length > 8
     ? `「${opts.taskTitle.slice(0, 8)}…」`
+    : opts.taskTitle
+
+  // 构建任务内容摘要：标题 + 描述
+  const taskContent = opts.taskDescription
+    ? `${opts.taskTitle}\n${opts.taskDescription}`
     : opts.taskTitle
 
   const content = [
@@ -87,8 +92,8 @@ export function buildTaskCompletedMarkdown(opts: {
     pendingStr,
     ``,
     `---`,
-    `**Prompt 摘要**:`,
-    `> ${opts.prompt.slice(0, 300)}${opts.prompt.length > 300 ? '...' : ''}`,
+    `**任务内容**:`,
+    `> ${taskContent.slice(0, 300)}${taskContent.length > 300 ? '...' : ''}`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -103,7 +108,7 @@ export function buildTaskFailedMarkdown(opts: {
   projectName: string
   taskTitle: string
   taskId: string
-  prompt: string
+  taskDescription?: string
   error: string
   durationMs?: number
   taskUrl?: string
@@ -111,6 +116,12 @@ export function buildTaskFailedMarkdown(opts: {
 }): WecomMessage {
   const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
   const pendingStr = opts.pendingCount != null ? `**待开发任务**: ${opts.pendingCount} 个` : ''
+
+  // 构建任务内容摘要：标题 + 描述
+  const taskContent = opts.taskDescription
+    ? `${opts.taskTitle}\n${opts.taskDescription}`
+    : opts.taskTitle
+
   const content = [
     `## ❌ 任务执行失败`,
     ``,
@@ -124,8 +135,8 @@ export function buildTaskFailedMarkdown(opts: {
     `> <font color="warning">${opts.error.slice(0, 500)}</font>`,
     ``,
     `---`,
-    `**Prompt 摘要**:`,
-    `> ${opts.prompt.slice(0, 200)}${opts.prompt.length > 200 ? '...' : ''}`,
+    `**任务内容**:`,
+    `> ${taskContent.slice(0, 200)}${taskContent.length > 200 ? '...' : ''}`,
   ]
     .filter(Boolean)
     .join('\n')

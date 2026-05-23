@@ -150,9 +150,14 @@ function runClaudeTask(
   project: Project,
   options?: RunOptions,
 ): Promise<RunResult> {
+  // 构建提示词：标题 + 描述
+  const combinedPrompt = task.description
+    ? `${task.title}\n\n${task.description}`
+    : task.title
+
   return runClaude({
     project,
-    prompt: task.prompt ?? '',
+    prompt: combinedPrompt,
     resumeSessionId: task.claudeSessionId ?? undefined,
     onLog: options?.onLog,
     abortSignal: options?.abortSignal,
