@@ -170,7 +170,7 @@ export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' |
   if (!db) return { ok: false, error: '未登录' }
   const repo = createTaskRepository(db)
   const now = new Date().toISOString()
-  const initialStatus = doc.status || (doc.isPlan ? 'plan_required' : 'planned')
+  const initialStatus = doc.status || (doc.isPlan ? 'plan_required' : 'pending')
   const timeEntries: TimeEntry[] = []
   let totalDuration = 0
   if (initialStatus === 'developing') {
