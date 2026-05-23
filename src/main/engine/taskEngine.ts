@@ -64,6 +64,7 @@ export class TaskEngine extends EventEmitter {
   private _provider?: string
   private projectLocks = new Map<string, Promise<void>>()
   private stoppedTaskIds = new Set<string>()
+  private queuedTaskIds = new Set<string>()
 
   constructor(options: EngineOptions) {
     super()
@@ -146,6 +147,11 @@ export class TaskEngine extends EventEmitter {
     this.changesFeed?.cancel?.()
     this.changesFeed = undefined
 
+    // 清空队列中等待的任务
+    this.queue.clear()
+    this.queuedTaskIds.clear()
+
+    // 标记并中止正在运行的任务
     for (const [taskId, ctrl] of this.runningTasks) {
       this.stoppedTaskIds.add(taskId)
       ctrl.abort()
@@ -164,6 +170,34 @@ export class TaskEngine extends EventEmitter {
     this.emit('status', this.getStatus())
   }
 
+  /**
+   * 继续执行被停止的任务
+   */
+  async resumeTask(taskId: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this._running) {
+      return { ok: false, error: '引擎未运行，请先启动引擎' }
+    }
+
+    const taskRepo = createTaskRepository(this.db)
+    const task = await taskRepo.findById(taskId)
+    if (!task) {
+      return { ok: false, error: '任务不存在' }
+    }
+
+    const canResume = task.status === TASK_STATUS.PENDING || task.status === TASK_STATUS.PLAN_REQUIRED
+    if (!canResume) {
+      return { ok: false, error: `任务状态为 ${task.status}，无法继续执行` }
+    }
+
+    // 从停止列表中移除
+    this.stoppedTaskIds.delete(taskId)
+
+    // 重新加入队列
+    this._enqueue(task)
+
+    return { ok: true }
+  }
+
   private async _scanPending(): Promise<void> {
     const taskRepo = createTaskRepository(this.db)
     const tasks = await taskRepo.findAll()
@@ -176,9 +210,15 @@ export class TaskEngine extends EventEmitter {
   private _enqueue(task: Task): void {
     if (!this._running) return
     if (this.runningTasks.has(task._id)) return
+    if (this.queuedTaskIds.has(task._id)) return
 
+    this.queuedTaskIds.add(task._id)
     this.queue.add(async () => {
-      await this._executeWithProjectLock(task)
+      try {
+        await this._executeWithProjectLock(task)
+      } finally {
+        this.queuedTaskIds.delete(task._id)
+      }
     })
 
     this.emit('status', this.getStatus())
@@ -208,6 +248,11 @@ export class TaskEngine extends EventEmitter {
   }
 
   private async _execute(task: Task): Promise<void> {
+    if (!this._running) {
+      console.log(`[engine] engine stopped, skipping task ${task._id}`)
+      return
+    }
+
     const taskRepo = createTaskRepository(this.db)
     const projectRepo = createProjectRepository(this.db)
 
@@ -242,6 +287,7 @@ export class TaskEngine extends EventEmitter {
     await taskRepo.update(task._id, {
       status: startStatus,
       claudeSessionId: inheritedSessionId,
+      reviewFeedback: undefined,
       updatedAt: new Date().toISOString(),
       ...startTimeChanges,
     })
@@ -365,9 +411,14 @@ export class TaskEngine extends EventEmitter {
             closedEntry.result = `执行失败: ${result.error}`
           }
         }
+
+        // 如果是被停止的任务，提供更清晰的错误信息
+        const isStopped = this.stoppedTaskIds.has(task._id)
+        const feedback = isStopped ? '任务已停止，可点击"继续执行"恢复' : (result.error ?? '执行失败')
+
         await taskRepo.update(task._id, {
           status: errorStatus,
-          reviewFeedback: result.error ?? '执行失败',
+          reviewFeedback: feedback,
           claudeSessionId: result.sessionId ?? inheritedSessionId,
           logs,
           updatedAt: new Date().toISOString(),
@@ -444,6 +495,7 @@ export class TaskEngine extends EventEmitter {
       this.emit('task:failed', task._id, err.message)
     } finally {
       this.runningTasks.delete(task._id)
+      this.stoppedTaskIds.delete(task._id)
       this._logWriteTimers.delete(task._id)
       this._pendingLogs.delete(task._id)
       this.emit('status', this.getStatus())

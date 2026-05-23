@@ -39,6 +39,18 @@ const showAppendPanel = ref(false)
 const showSubtaskPanel = ref(false)
 const showPlanFullscreen = ref(false)
 
+// 继续执行
+const isResuming = ref(false)
+
+const canResume = computed(() => {
+  if (!task.value) return false
+  const hasSessionId = !!task.value.claudeSessionId
+  const isPendingOrPlanRequired =
+    task.value.status === TASK_STATUS.PENDING || task.value.status === TASK_STATUS.PLAN_REQUIRED
+  const wasStopped = task.value.reviewFeedback?.includes('已停止') || task.value.reviewFeedback?.includes('停止')
+  return hasSessionId && isPendingOrPlanRequired && wasStopped
+})
+
 const childTasks = computed(() => {
   if (!task.value) return []
   return taskStore.tasks
@@ -216,6 +228,29 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
     await taskStore.fetch()
   }
 }
+
+// ── 复制 Session ID ──
+function copySessionId() {
+  if (!task.value?.claudeSessionId) return
+  navigator.clipboard.writeText(task.value.claudeSessionId)
+}
+
+// ── 继续执行 ──
+async function handleResume() {
+  if (!task.value) return
+  isResuming.value = true
+  try {
+    const result = await taskStore.resume(task.value._id)
+    if (result.ok) {
+      // 刷新任务数据
+      await taskStore.fetch()
+    } else {
+      alert(result.error || '继续执行失败')
+    }
+  } finally {
+    isResuming.value = false
+  }
+}
 </script>
 
 <template>
@@ -340,7 +375,10 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
       </div>
       <div v-if="task.claudeSessionId" class="info-row">
         <span class="info-label">Claude Session ID</span>
-        <span class="info-value session-id">{{ task.claudeSessionId }}</span>
+        <span class="info-value session-id">
+          <code>{{ task.claudeSessionId }}</code>
+          <button class="glass-button btn-sm" @click="copySessionId" title="复制">📋</button>
+        </span>
       </div>
       <div class="info-row">
         <span class="info-label">创建时间</span>
@@ -358,6 +396,17 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
         </span>
       </div>
     </section>
+
+    <!-- 继续执行按钮（仅对被停止的任务显示） -->
+    <div v-if="canResume" class="resume-prompt glass">
+      <p class="resume-text">
+        <span class="resume-icon">⚠️</span>
+        该任务已被停止，您可以继续执行
+      </p>
+      <button class="glass-button primary" @click="handleResume" :disabled="isResuming">
+        {{ isResuming ? '继续中...' : '继续执行' }}
+      </button>
+    </div>
 
     <!-- 子任务列表 -->
     <section v-if="childTasks.length" class="child-tasks">
@@ -916,6 +965,70 @@ header .actions {
   .transitions-panel :deep(.actions button) {
     width: 100%;
     min-height: 44px;
+  }
+}
+
+/* ── Session ID 显示 ── */
+.session-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.session-id code {
+  background: rgba(0, 0, 0, 0.04);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.8125rem;
+  word-break: break-all;
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.session-id .btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  min-height: 28px;
+}
+
+/* ── 继续执行提示 ── */
+.resume-prompt {
+  padding: var(--space-lg);
+  margin-top: var(--space-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  background: rgba(255, 149, 10, 0.08);
+  border: 1px solid rgba(255, 149, 10, 0.3);
+}
+
+.resume-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.resume-icon {
+  font-size: 1.125rem;
+}
+
+.resume-prompt .glass-button {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .resume-prompt {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .resume-text {
+    justify-content: center;
   }
 }
 </style>

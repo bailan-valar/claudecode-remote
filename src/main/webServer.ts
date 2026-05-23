@@ -215,6 +215,12 @@ export function startWebServer(): void {
           sendJson(res, 200, result)
           return
         }
+        if (pathname.startsWith('/api/tasks/') && pathname.endsWith('/resume') && req.method === 'POST') {
+          const id = pathname.slice('/api/tasks/'.length, -'/resume'.length)
+          const result = await api.resumeTaskAction(id)
+          sendJson(res, 200, result)
+          return
+        }
 
         // Engine
         if (pathname === '/api/engine/status' && req.method === 'GET') {

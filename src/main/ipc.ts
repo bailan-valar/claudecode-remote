@@ -73,6 +73,9 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.removeHandler('task:delete')
   ipcMain.handle('task:delete', async (_, id: string) => api.deleteTaskAction(id))
 
+  ipcMain.removeHandler('task:resume')
+  ipcMain.handle('task:resume', async (_, id: string) => api.resumeTaskAction(id))
+
   // --- Engine handlers ---
   ipcMain.removeHandler('engine:status')
   ipcMain.handle('engine:status', async () => api.getEngineStatusAction())

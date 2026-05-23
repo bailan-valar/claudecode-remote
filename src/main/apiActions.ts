@@ -158,6 +158,8 @@ export async function listTasksAction(projectId?: string) {
   if (projectId) {
     tasks = tasks.filter((t) => t.projectId === projectId)
   }
+  // 按更新时间倒序排列（最新的在前）
+  tasks.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
   console.log('[api] task:list ok, count=', tasks.length)
   return { ok: true, tasks }
 }
@@ -221,6 +223,17 @@ export async function deleteTaskAction(id: string) {
   await repo.delete(id)
   console.log('[api] task:delete ok')
   return { ok: true }
+}
+
+export async function resumeTaskAction(id: string) {
+  console.log('[api] task:resume', id)
+  const engine = getEngine()
+  if (!engine) {
+    return { ok: false, error: '引擎未初始化' }
+  }
+  const result = await engine.resumeTask(id)
+  console.log('[api] task:resume', result.ok ? 'ok' : 'failed:', result.error)
+  return result
 }
 
 // === Engine ===

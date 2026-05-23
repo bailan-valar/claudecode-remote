@@ -70,7 +70,7 @@ function runClaude(options: RunClaudeOptions): Promise<RunResult> {
     }
 
     options?.abortSignal?.addEventListener('abort', () => {
-      finish({ success: false, error: '用户取消', sessionId: capturedSessionId })
+      finish({ success: false, error: '任务已停止', sessionId: capturedSessionId })
     })
 
     child.stdout.setEncoding('utf8')

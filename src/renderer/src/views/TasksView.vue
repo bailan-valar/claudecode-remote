@@ -102,14 +102,26 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <div v-if="showForm" class="form-panel glass">
-      <TaskForm
-        :projects="projectStore.projects"
-        :tasks="taskStore.tasks"
-        @submit="showForm = false"
-        @cancel="showForm = false"
-      />
-    </div>
+    <!-- 新建任务对话框 -->
+    <Teleport to="body">
+      <div v-if="showForm" class="task-create-overlay" @click.self="showForm = false">
+        <div class="task-create-dialog glass-strong">
+          <div class="dialog-header">
+            <h2>新建任务</h2>
+            <button class="close-button" @click="showForm = false">✕</button>
+          </div>
+          <div class="dialog-body">
+            <TaskForm
+              :projects="projectStore.projects"
+              :tasks="taskStore.tasks"
+              mode="create"
+              @submit="showForm = false"
+              @cancel="showForm = false"
+            />
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <div class="filters-bar">
       <TaskFilters
@@ -219,9 +231,115 @@ header {
   border-color: transparent;
 }
 
+/* 新建任务对话框样式 */
+.task-create-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: fadeIn 0.2s ease;
+  padding: var(--space-lg);
+}
+
+.task-create-dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: scaleIn 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1.5rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.close-button:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+}
+
+.dialog-body {
+  padding: var(--space-lg);
+  overflow-y: auto;
+  max-height: calc(90vh - 80px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 640px) {
   .header-actions {
     gap: var(--space-sm);
+  }
+
+  .task-create-overlay {
+    padding: var(--space-md);
+  }
+
+  .task-create-dialog {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .dialog-header {
+    padding: var(--space-md);
+  }
+
+  .dialog-body {
+    padding: var(--space-md);
+    max-height: calc(100vh - 70px);
   }
 }
 </style>

@@ -59,5 +59,10 @@ export const useTaskStore = defineStore('task', () => {
     return result
   }
 
-  return { tasks, isLoading, currentProjectId, filteredTasks, stats, fetch, create, update, updateStatus, remove }
+  async function resume(id: string) {
+    const result = await apiClient.resumeTask(id)
+    return result
+  }
+
+  return { tasks, isLoading, currentProjectId, filteredTasks, stats, fetch, create, update, updateStatus, remove, resume }
 })
