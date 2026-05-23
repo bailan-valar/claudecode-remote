@@ -782,7 +782,8 @@ header .actions {
   border-radius: var(--radius-lg);
   font-size: 0.9375rem;
   line-height: 1.5;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .chat-message.user .chat-bubble {
@@ -794,6 +795,13 @@ header .actions {
   background: rgba(0, 0, 0, 0.04);
   color: var(--color-text);
   border: 1px solid var(--glass-border-subtle);
+}
+
+.chat-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .chat-text pre {
