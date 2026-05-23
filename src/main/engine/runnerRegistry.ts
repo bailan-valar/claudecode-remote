@@ -9,7 +9,7 @@ class PlaceholderRunner implements TaskRunner {
     this.name = name
   }
 
-  async run(): Promise<RunResult> {
+  async runTask(): Promise<RunResult> {
     return {
       success: false,
       error: `${this.name} 执行引擎尚未实现，请切换为 anthropic (Claude Code)`,

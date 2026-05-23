@@ -229,7 +229,7 @@ export class TaskEngine extends EventEmitter {
     try {
       const runner = getRunner(this._provider ?? project.llmConfig?.provider)
       console.log(`[engine] 使用执行引擎: ${runner.name} (provider=${this._provider ?? project.llmConfig?.provider ?? 'anthropic'})`)
-      const result = await runner.run(taskWithSession, project, {
+      const result = await runner.runTask(taskWithSession, project, {
         onLog: (entry) => {
           logs.push(entry)
           this._throttledLogWrite(task._id, logs)
