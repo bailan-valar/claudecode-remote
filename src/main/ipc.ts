@@ -287,7 +287,30 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const engine = getEngine()
     if (engine) {
       engine.setConcurrency(n)
-      saveEngineState({ running: engine.running, concurrency: n })
+      saveEngineState({ running: engine.running, concurrency: n, provider: engine.getProvider() })
+    }
+    return { ok: true }
+  })
+
+  ipcMain.removeHandler('engine:listProviders')
+  ipcMain.handle('engine:listProviders', async () => {
+    return { ok: true, providers: listRunners() }
+  })
+
+  ipcMain.removeHandler('engine:getProvider')
+  ipcMain.handle('engine:getProvider', async () => {
+    const engine = getEngine()
+    return { ok: true, provider: engine?.getProvider?.() ?? loadEngineState().provider ?? 'anthropic' }
+  })
+
+  ipcMain.removeHandler('engine:setProvider')
+  ipcMain.handle('engine:setProvider', async (_, name: string) => {
+    const engine = getEngine()
+    if (engine) {
+      engine.setProvider(name)
+      saveEngineState({ running: engine.running, concurrency: engine.concurrency, provider: name })
+    } else {
+      saveEngineState({ running: loadEngineState().running, concurrency: loadEngineState().concurrency, provider: name })
     }
     return { ok: true }
   })

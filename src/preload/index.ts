@@ -48,6 +48,9 @@ const api = {
   pauseEngine: () => ipcRenderer.invoke('engine:pause'),
   resumeEngine: () => ipcRenderer.invoke('engine:resume'),
   setEngineConcurrency: (n: number) => ipcRenderer.invoke('engine:setConcurrency', n),
+  listEngineProviders: () => ipcRenderer.invoke('engine:listProviders'),
+  getEngineProvider: () => ipcRenderer.invoke('engine:getProvider'),
+  setEngineProvider: (name: string) => ipcRenderer.invoke('engine:setProvider', name),
   onEngineStatus: (cb: (status: any) => void) => {
     const listener = (_: unknown, status: any) => cb(status)
     ipcRenderer.on('engine:status', listener)

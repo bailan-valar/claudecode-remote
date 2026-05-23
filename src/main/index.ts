@@ -88,7 +88,7 @@ app.whenReady().then(() => {
   const db = syncManager.getLocalDb()
   if (db) {
     const state = loadEngineState()
-    engine = new TaskEngine({ db, concurrency: state.concurrency ?? 1 })
+    engine = new TaskEngine({ db, concurrency: state.concurrency ?? 1, provider: state.provider })
     if (state.running) {
       engine.start()
     }
