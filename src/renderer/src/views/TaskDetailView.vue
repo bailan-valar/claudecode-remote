@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted, computed, defineOptions } from 'vue'
+import { onMounted, ref, watch, onUnmounted, computed, defineOptions, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -35,6 +35,9 @@ let timerId: ReturnType<typeof setInterval> | null = null
 // Tab 切换
 const activeTab = ref<'detail' | 'logs'>('detail')
 const selectedPhaseIndex = ref(0)
+
+// 日志列表引用
+const logListRef = ref<HTMLElement | null>(null)
 
 // 追加任务
 const showAppendPanel = ref(false)
@@ -244,6 +247,22 @@ async function handleResume() {
     isResuming.value = false
   }
 }
+
+// ── 滚动日志到底部 ──
+function scrollLogsToBottom() {
+  nextTick(() => {
+    if (logListRef.value) {
+      logListRef.value.scrollTop = logListRef.value.scrollHeight
+    }
+  })
+}
+
+// ── 监听tab切换和阶段选择，自动滚动到底部 ──
+watch([activeTab, selectedPhaseIndex], () => {
+  if (activeTab.value === 'logs') {
+    scrollLogsToBottom()
+  }
+})
 </script>
 
 <template>
@@ -461,7 +480,7 @@ async function handleResume() {
           <div class="phase-detail-body">
             <template v-if="selectedPhase.status === 'developing' || selectedPhase.status === 'planning'">
               <div class="content-label">{{ selectedPhase.status === 'planning' ? '计划执行日志' : '开发日志' }}</div>
-              <div v-if="getPhaseLogs(selectedPhase).length" class="log-list">
+              <div v-if="getPhaseLogs(selectedPhase).length" ref="logListRef" class="log-list">
                 <div
                   v-for="(log, idx) in getPhaseLogs(selectedPhase)"
                   :key="idx"
