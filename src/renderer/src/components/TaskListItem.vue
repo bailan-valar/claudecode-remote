@@ -160,7 +160,7 @@ function onDragEnd(e: DragEvent) {
   <!-- Compact mode -->
   <li
     v-else-if="mode === 'compact'"
-    class="task-compact-item glass"
+    class="task-compact-item"
     :draggable="draggable"
     @dragstart="onDragStart"
     @dragend="onDragEnd"
@@ -504,14 +504,15 @@ function onDragEnd(e: DragEvent) {
   align-items: center;
   justify-content: space-between;
   gap: 1px;
-  transition: background var(--transition-fast);
+  transition: background-color var(--transition-fast);
   border-radius: 0;
   min-height: 20px;
   border-bottom: 1px solid var(--glass-border-subtle);
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 .task-compact-item:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 .task-compact-item .compact-main {
@@ -532,6 +533,8 @@ function onDragEnd(e: DragEvent) {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .task-compact-item .compact-title:hover {
@@ -547,6 +550,8 @@ function onDragEnd(e: DragEvent) {
   color: var(--color-text-secondary);
   overflow: hidden;
   flex-shrink: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .task-compact-item .compact-meta .kind {
