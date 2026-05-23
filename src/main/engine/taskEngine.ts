@@ -246,7 +246,10 @@ export class TaskEngine extends EventEmitter {
       this._pendingLogs.delete(task._id)
 
       if (result.success) {
-        const commitResult = await autoCommit(project.path, task.title)
+        const currentTask = await taskRepo.findById(task._id) ?? latestTask
+        const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.REVIEWING)
+        const durationSeconds = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+        const commitResult = await autoCommit(project.path, task.title, durationSeconds)
         const commitLog: LogEntry = {
           timestamp: new Date().toISOString(),
           level: commitResult.success ? 'info' : 'warn',
@@ -256,8 +259,6 @@ export class TaskEngine extends EventEmitter {
         }
         logs.push(commitLog)
 
-        const currentTask = await taskRepo.findById(task._id) ?? latestTask
-        const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.REVIEWING)
         await taskRepo.update(task._id, {
           status: TASK_STATUS.REVIEWING,
           claudeSessionId: result.sessionId ?? inheritedSessionId,

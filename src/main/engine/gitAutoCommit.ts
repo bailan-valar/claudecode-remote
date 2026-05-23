@@ -1,5 +1,17 @@
 import { simpleGit, type SimpleGit } from 'simple-git'
 
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds < 0) totalSeconds = 0
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const parts: string[] = []
+  if (hours > 0) parts.push(`${hours}小时`)
+  if (minutes > 0 || hours > 0) parts.push(`${minutes}分钟`)
+  parts.push(`${seconds}秒`)
+  return parts.join('')
+}
+
 export interface GitCommitResult {
   success: boolean
   commitHash?: string
@@ -14,6 +26,7 @@ export interface GitCommitResult {
 export async function autoCommit(
   projectPath: string,
   taskTitle: string,
+  durationSeconds?: number,
 ): Promise<GitCommitResult> {
   try {
     const git: SimpleGit = simpleGit(projectPath)
@@ -33,7 +46,13 @@ export async function autoCommit(
       status.deleted.length > 0 ||
       status.renamed.length > 0
 
-    const commitMsg = `auto: complete task "${taskTitle}"`
+    const durationText =
+      typeof durationSeconds === 'number' && durationSeconds > 0
+        ? formatDuration(durationSeconds)
+        : ''
+    const commitMsg = durationText
+      ? `auto: complete task "${taskTitle}" (${durationText})`
+      : `auto: complete task "${taskTitle}"`
 
     // 如果有变更，先添加到暂存区
     if (hasChanges) {
