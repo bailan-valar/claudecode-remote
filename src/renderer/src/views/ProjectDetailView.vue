@@ -5,12 +5,14 @@ import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
 import ProjectForm from '../components/ProjectForm.vue'
 import TaskForm from '../components/TaskForm.vue'
+import TaskCreatePanel from '../components/TaskCreatePanel.vue'
+import TaskEditDialog from '../components/TaskEditDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import TaskListItem from '../components/TaskListItem.vue'
 import { apiClient } from '../api/index'
 import type { Project } from '../../../shared/types'
 import type { LogEntry } from '../../../main/engine/runner'
-import type { TaskStatus } from '../../../shared/constants'
+import type { TaskStatus, Task } from '../../../shared/constants'
 
 defineOptions({
   name: 'ProjectDetailView'
@@ -26,6 +28,8 @@ const project = ref<Project | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const showCreateTask = ref(false)
+const showTaskDialog = ref(false)
+const editingTask = ref<Task | undefined>(undefined)
 const activeTab = ref<'info' | 'tasks' | 'chat' | 'terminal'>('info')
 const tick = ref(0)
 let timerId: ReturnType<typeof setInterval> | null = null
@@ -81,6 +85,36 @@ async function handleTaskCreated() {
   await taskStore.fetch(projectId)
 }
 
+async function handleTaskDialogSubmit(task?: Task, changes?: Partial<Task>) {
+  showTaskDialog.value = false
+  editingTask.value = undefined
+  if (task && changes) {
+    // 编辑模式
+    const result = await taskStore.update(task._id, changes)
+    if (result.ok) {
+      await taskStore.fetch(projectId)
+    }
+  } else {
+    // 新增模式
+    await taskStore.fetch(projectId)
+  }
+}
+
+function openCreateTaskDialog() {
+  editingTask.value = undefined
+  showTaskDialog.value = true
+}
+
+function openEditTaskDialog(task: Task) {
+  editingTask.value = task
+  showTaskDialog.value = true
+}
+
+function closeTaskDialog() {
+  showTaskDialog.value = false
+  editingTask.value = undefined
+}
+
 const deletingTaskId = ref<string | null>(null)
 
 async function handleDeleteTask(taskId: string) {
@@ -99,7 +133,10 @@ function handleTaskTransition(status: TaskStatus) {
 }
 
 function handleTaskEdit(taskId: string) {
-  router.push({ name: 'task-detail', params: { id: taskId } })
+  const task = sortedTasks.value.find(t => t._id === taskId)
+  if (task) {
+    openEditTaskDialog(task)
+  }
 }
 
 // 为项目详情页添加排序后的任务列表
@@ -413,19 +450,7 @@ onUnmounted(() => {
       <!-- 任务列表 -->
       <section v-show="activeTab === 'tasks'" class="tasks">
         <div class="tasks-header">
-          <button v-if="!showCreateTask" class="glass-button primary" @click="showCreateTask = true">+ 新建任务</button>
-          <button v-else class="glass-button" @click="showCreateTask = false">取消</button>
-        </div>
-
-        <div v-if="showCreateTask" class="form-panel glass">
-          <TaskForm
-            :projects="project ? [project] : []"
-            :tasks="sortedTasks"
-            :default-project-id="projectId"
-            mode="create"
-            @submit="handleTaskCreated"
-            @cancel="showCreateTask = false"
-          />
+          <button class="glass-button primary" @click="openCreateTaskDialog">+ 新建任务</button>
         </div>
 
         <ul v-if="sortedTasks.length" class="task-list">
@@ -570,6 +595,17 @@ onUnmounted(() => {
       :visible="deletingTaskId !== null"
       @confirm="handleDeleteTask(deletingTaskId!)"
       @cancel="deletingTaskId = null"
+    />
+
+    <TaskEditDialog
+      :visible="showTaskDialog"
+      :task="editingTask"
+      :projects="project ? [project] : []"
+      :tasks="sortedTasks"
+      :mode="editingTask ? 'edit' : 'create'"
+      :default-project-id="projectId"
+      @submit="handleTaskDialogSubmit"
+      @cancel="closeTaskDialog"
     />
   </div>
 </template>

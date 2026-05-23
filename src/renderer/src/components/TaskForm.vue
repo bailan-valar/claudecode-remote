@@ -105,26 +105,55 @@ async function handleSubmit() {
 
 <template>
   <form class="task-form" @submit.prevent="handleSubmit">
-    <input v-model="title" class="glass-input" placeholder="任务标题" required />
-    <select v-if="!props.defaultProjectId" v-model="projectId" class="glass-input" required>
-      <option value="" disabled>选择项目</option>
-      <option v-for="p in projects" :key="p._id" :value="p._id">{{ p.name }}</option>
-    </select>
-    <select v-if="eligibleParentTasks.length" v-model="parentTaskId" class="glass-input">
-      <option :value="null">无父任务</option>
-      <option v-for="t in eligibleParentTasks" :key="t._id" :value="t._id">{{ t.title }}</option>
-    </select>
-    <select v-model="status" class="glass-input" required>
-      <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
-    </select>
-    <label class="plan-check">
-      <input v-model="isPlan" type="checkbox" />
-      <span>需要编写开发计划</span>
-    </label>
-    <select v-model="kind" class="glass-input" required>
-      <option v-for="k in Object.values(TASK_KIND)" :key="k" :value="k">{{ KIND_LABEL[k] }}</option>
-    </select>
-    <textarea v-model="description" class="glass-input" placeholder="描述（可选）" rows="2" />
+    <div class="form-group">
+      <label class="form-label">任务标题 *</label>
+      <input v-model="title" class="glass-input" placeholder="请输入任务标题" required />
+    </div>
+
+    <div v-if="!props.defaultProjectId" class="form-group">
+      <label class="form-label">所属项目 *</label>
+      <select v-model="projectId" class="glass-input" required>
+        <option value="" disabled>请选择项目</option>
+        <option v-for="p in projects" :key="p._id" :value="p._id">{{ p.name }}</option>
+      </select>
+    </div>
+
+    <div v-if="eligibleParentTasks.length" class="form-group">
+      <label class="form-label">父任务</label>
+      <select v-model="parentTaskId" class="glass-input">
+        <option :value="null">无父任务</option>
+        <option v-for="t in eligibleParentTasks" :key="t._id" :value="t._id">{{ t.title }}</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">任务状态 *</label>
+        <select v-model="status" class="glass-input" required>
+          <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">任务类型 *</label>
+        <select v-model="kind" class="glass-input" required>
+          <option v-for="k in Object.values(TASK_KIND)" :key="k" :value="k">{{ KIND_LABEL[k] }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="plan-check">
+        <input v-model="isPlan" type="checkbox" />
+        <span>需要编写开发计划</span>
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">任务描述</label>
+      <textarea v-model="description" class="glass-input" placeholder="请输入任务描述（可选）" rows="3" />
+    </div>
+
     <div class="actions">
       <button type="submit" class="glass-button primary">{{ isEdit ? '保存' : '创建' }}</button>
       <button type="button" class="glass-button" @click="emit('cancel')">取消</button>
@@ -136,13 +165,59 @@ async function handleSubmit() {
 .task-form {
   display: flex;
   flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-md);
+}
+
+.form-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.glass-input {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.glass-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+}
+
+.glass-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
 }
 
 .actions {
   display: flex;
   gap: var(--space-sm);
   margin-top: var(--space-sm);
+  justify-content: flex-end;
 }
 
 .plan-check {
@@ -152,11 +227,29 @@ async function handleSubmit() {
   font-size: 0.9375rem;
   color: var(--color-text);
   cursor: pointer;
+  user-select: none;
 }
 
 .plan-check input {
   width: 18px;
   height: 18px;
   cursor: pointer;
+  accent-color: var(--color-accent);
+}
+
+@media (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .actions .glass-button {
+    width: 100%;
+  }
 }
 </style>
