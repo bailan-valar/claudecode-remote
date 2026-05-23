@@ -22,7 +22,10 @@ const statusList = Object.values(TASK_STATUS) as TaskStatus[]
 const grouped = computed(() => {
   const map = {} as Record<TaskStatus, Task[]>
   statusList.forEach((s) => {
-    map[s] = props.tasks.filter((t) => t.status === s)
+    const filtered = props.tasks.filter((t) => t.status === s)
+    // Sort by updatedAt in descending order (most recent first)
+    filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    map[s] = filtered
   })
   return map
 })

@@ -39,6 +39,8 @@ const displayTasks = computed(() => {
   if (viewMode.value === 'list' && selectedStatus.value) {
     list = list.filter((t) => t.status === selectedStatus.value)
   }
+  // Sort by updatedAt in descending order (most recent first)
+  list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
   return list
 })
 
