@@ -75,6 +75,13 @@ function onDragEnd(e: DragEvent) {
     @dragend="onDragEnd"
   >
     <div class="task-main">
+      <RouterLink
+        :to="{ name: 'task-detail', params: { id: task._id } }"
+        class="title"
+        @click="emit('navigate', task._id)"
+      >
+        {{ task.title }}
+      </RouterLink>
       <div class="task-header">
         <div class="task-badges">
           <StatusBadge :status="task.status" />
@@ -103,13 +110,6 @@ function onDragEnd(e: DragEvent) {
           </span>
         </div>
       </div>
-      <RouterLink
-        :to="{ name: 'task-detail', params: { id: task._id } }"
-        class="title"
-        @click="emit('navigate', task._id)"
-      >
-        {{ task.title }}
-      </RouterLink>
     </div>
     <div class="actions">
       <TaskStatusActions :status="task.status" @transition="emit('transition', $event)" />
@@ -219,7 +219,7 @@ function onDragEnd(e: DragEvent) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
 
 .task-list-item .task-header {
@@ -228,6 +228,7 @@ function onDragEnd(e: DragEvent) {
   align-items: center;
   gap: var(--space-md);
   flex-wrap: wrap;
+  padding-top: var(--space-xs);
 }
 
 .task-list-item .task-badges {
@@ -246,12 +247,14 @@ function onDragEnd(e: DragEvent) {
 
 .task-list-item .title {
   font-weight: 600;
-  font-size: 1.0625rem;
+  font-size: 1.125rem;
   color: var(--color-text);
   text-decoration: none;
   letter-spacing: -0.01em;
-  line-height: 1.4;
+  line-height: 1.3;
   transition: color var(--transition-fast);
+  display: block;
+  margin-bottom: var(--space-xs);
 }
 
 .task-list-item .title:hover {
