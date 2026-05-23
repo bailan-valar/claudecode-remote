@@ -110,6 +110,12 @@ const httpApi: Api = {
   chatWithClaude: (projectId, message, sessionId?) =>
     httpInvoke('POST', '/api/claude/chat', { projectId, message, sessionId }),
   abortClaudeChat: () => Promise.resolve({ ok: false, error: 'Web 端暂不支持中断' }),
+  getChatHistory: (projectId) =>
+    httpInvoke('GET', `/api/claude/history?projectId=${encodeURIComponent(projectId)}`),
+  saveChatMessage: (message) =>
+    httpInvoke('POST', '/api/claude/messages', message),
+  clearChatHistory: (projectId) =>
+    httpInvoke('DELETE', `/api/claude/history?projectId=${encodeURIComponent(projectId)}`),
   onClaudeChatLog: (cb) => registerSseListener('claude:chat:log', cb),
   onClaudeChatDone: (cb) => registerSseListener('claude:chat:done', cb),
 

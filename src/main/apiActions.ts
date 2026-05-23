@@ -1,6 +1,7 @@
 import { syncManager, authManager, getEngine, setEngine } from './index'
 import { createProjectRepository } from './repositories/projectRepository'
 import { createTaskRepository } from './repositories/taskRepository'
+import { createChatRepository, createChatSessionRepository } from './repositories/chatRepository'
 import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState, saveEngineState } from './engineState'
 import { listRunners } from './engine/runnerRegistry'
@@ -10,7 +11,7 @@ import { broadcast } from './events'
 import { sendWecomMessage, buildTestMessage } from './engine/wecomNotifier'
 import { runClaudeChat } from './engine/claudeRunner'
 import { saveCredentials, loadCredentials, clearCredentials } from './credentialStore'
-import type { Project, Task } from '../shared/types'
+import type { Project, Task, ChatMessage } from '../shared/types'
 import type { LogEntry } from './engine/runner'
 
 function setupEngine(db: PouchDB.Database, options: { concurrency?: number; provider?: string }): TaskEngine {
@@ -364,6 +365,53 @@ export function abortClaudeChatAction(chatId?: string) {
       ctrl.abort()
     }
   }
+  return { ok: true }
+}
+
+// === Chat History ===
+
+export async function getChatHistoryAction(projectId: string) {
+  console.log('[api] chat:history', projectId)
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+
+  const chatRepo = createChatRepository(db)
+  const messages = await chatRepo.findByProjectId(projectId)
+
+  // 获取最新的会话ID
+  const latestMessage = await chatRepo.findLatestSession(projectId)
+  const sessionId = latestMessage?.sessionId
+
+  console.log('[api] chat:history ok', messages.length, 'messages')
+  return { ok: true, messages, sessionId }
+}
+
+export async function saveChatMessageAction(message: Omit<ChatMessage, '_id' | '_rev'>) {
+  console.log('[api] chat:save', message.projectId, message.role)
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+
+  const chatRepo = createChatRepository(db)
+  const now = new Date().toISOString()
+
+  const chatMessage = await chatRepo.create({
+    ...message,
+    timestamp: message.timestamp || now,
+  })
+
+  console.log('[api] chat:save ok', chatMessage._id)
+  return { ok: true, message: chatMessage }
+}
+
+export async function clearChatHistoryAction(projectId: string) {
+  console.log('[api] chat:clear', projectId)
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+
+  const chatRepo = createChatRepository(db)
+  await chatRepo.deleteByProjectId(projectId)
+
+  console.log('[api] chat:clear ok')
   return { ok: true }
 }
 

@@ -282,6 +282,23 @@ export function startWebServer(): void {
           sendJson(res, 200, result)
           return
         }
+        if (pathname === '/api/claude/history' && req.method === 'GET') {
+          const projectId = url.searchParams.get('projectId') || ''
+          const result = await api.getChatHistoryAction(projectId)
+          sendJson(res, 200, result)
+          return
+        }
+        if (pathname === '/api/claude/messages' && req.method === 'POST') {
+          const result = await api.saveChatMessageAction(body)
+          sendJson(res, 200, result)
+          return
+        }
+        if (pathname === '/api/claude/history' && req.method === 'DELETE') {
+          const projectId = url.searchParams.get('projectId') || ''
+          const result = await api.clearChatHistoryAction(projectId)
+          sendJson(res, 200, result)
+          return
+        }
 
         // Terminal
         if (pathname === '/api/terminal/execute' && req.method === 'POST') {

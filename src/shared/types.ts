@@ -66,6 +66,34 @@ export interface Task extends BaseDoc {
   result?: string
 }
 
+export interface ChatMessage {
+  _id?: string
+  _rev?: string
+  type: 'chat-message'
+  projectId: string
+  role: 'user' | 'assistant'
+  content: string
+  logs?: Array<{
+    timestamp: string
+    level: 'info' | 'warn' | 'error'
+    message: string
+  }>
+  timestamp: string
+  sessionId: string
+  status?: 'streaming' | 'done' | 'error'
+}
+
+export interface ChatSession {
+  _id?: string
+  _rev?: string
+  type: 'chat-session'
+  projectId: string
+  sessionId: string
+  createdAt: string
+  updatedAt: string
+  title?: string // 可选的会话标题
+}
+
 export interface User {
   username: string
   roles: string[]

@@ -64,6 +64,13 @@ watch(
   { immediate: true },
 )
 
+// 监听标签切换，加载聊天历史
+watch(activeTab, async (newTab) => {
+  if (newTab === 'chat' && project.value) {
+    await loadChatHistory()
+  }
+})
+
 async function handleUpdate(changes?: Partial<Project>) {
   if (!project.value || !changes) return
   const result = await projectStore.update(project.value._id, changes)
@@ -157,6 +164,7 @@ interface ChatMessage {
 const chatMessages = ref<ChatMessage[]>([])
 const chatInput = ref('')
 const chatLoading = ref(false)
+const chatHistoryLoading = ref(false)
 const chatSessionId = ref<string | undefined>(undefined)
 const chatContainerRef = ref<HTMLElement | null>(null)
 let chatLogUnsubscribe: (() => void) | null = null
@@ -201,14 +209,31 @@ async function handleSendChat() {
   const message = chatInput.value.trim()
   if (!message || chatLoading.value || !project.value) return
 
-  chatMessages.value.push({
+  const userMsg: ChatMessage = {
     id: Date.now().toString() + '_u',
     role: 'user',
     content: message,
     logs: [],
     timestamp: new Date().toISOString(),
     status: 'done',
-  })
+  }
+  chatMessages.value.push(userMsg)
+
+  // 保存用户消息到数据库
+  try {
+    await apiClient.saveChatMessage({
+      type: 'chat-message',
+      projectId: project.value._id,
+      role: 'user',
+      content: message,
+      timestamp: userMsg.timestamp,
+      sessionId: chatSessionId.value || generateSessionId(),
+      status: 'done'
+    })
+  } catch (err) {
+    console.warn('保存用户消息失败:', err)
+  }
+
   chatInput.value = ''
   scrollChatToBottom()
 
@@ -233,6 +258,21 @@ async function handleSendChat() {
       if (result.sessionId) {
         chatSessionId.value = result.sessionId
       }
+
+      // 保存助手消息到数据库
+      try {
+        await apiClient.saveChatMessage({
+          type: 'chat-message',
+          projectId: project.value._id,
+          role: 'assistant',
+          content: assistantMsg.content,
+          timestamp: assistantMsg.timestamp,
+          sessionId: chatSessionId.value,
+          status: 'done'
+        })
+      } catch (err) {
+        console.warn('保存助手消息失败:', err)
+      }
     } else {
       assistantMsg.status = 'error'
       assistantMsg.content = result.error || '对话失败'
@@ -246,9 +286,53 @@ async function handleSendChat() {
   }
 }
 
-function clearChat() {
+// 生成会话ID
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// 加载聊天历史
+async function loadChatHistory() {
+  if (!project.value) return
+
+  chatHistoryLoading.value = true
+
+  try {
+    const result = await apiClient.getChatHistory(project.value._id)
+    if (result.ok && result.messages) {
+      chatMessages.value = result.messages.map((msg: any) => ({
+        id: msg._id || Date.now().toString(),
+        role: msg.role,
+        content: msg.content,
+        logs: msg.logs || [],
+        timestamp: msg.timestamp,
+        status: msg.status || 'done'
+      }))
+
+      if (result.sessionId) {
+        chatSessionId.value = result.sessionId
+      }
+
+      scrollChatToBottom()
+    }
+  } catch (err) {
+    console.warn('加载聊天历史失败:', err)
+  } finally {
+    chatHistoryLoading.value = false
+  }
+}
+
+async function clearChat() {
   chatMessages.value = []
   chatSessionId.value = undefined
+
+  if (!project.value) return
+
+  try {
+    await apiClient.clearChatHistory(project.value._id)
+  } catch (err) {
+    console.warn('清除聊天历史失败:', err)
+  }
 }
 
 // ── Terminal ──
@@ -330,6 +414,9 @@ onMounted(() => {
 
   chatLogUnsubscribe = apiClient.onClaudeChatLog(handleChatLog)
   chatDoneUnsubscribe = apiClient.onClaudeChatDone(handleChatDone)
+
+  // 加载聊天历史
+  loadChatHistory()
 })
 
 onUnmounted(() => {
@@ -475,7 +562,10 @@ onUnmounted(() => {
           <span v-if="chatSessionId" class="session-hint">已恢复会话</span>
         </div>
         <div ref="chatContainerRef" class="chat-container glass">
-          <div v-if="!chatMessages.length" class="chat-empty">
+          <div v-if="chatHistoryLoading" class="chat-loading">
+            <p>加载聊天历史中...</p>
+          </div>
+          <div v-else-if="!chatMessages.length" class="chat-empty">
             <p>在此直接与 Claude 对话，支持项目上下文和工具调用。</p>
           </div>
           <div
@@ -794,6 +884,33 @@ header .actions {
   color: var(--color-text-secondary);
   padding: var(--space-2xl);
   font-size: 0.9375rem;
+}
+
+.chat-loading {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--space-2xl);
+  font-size: 0.9375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.chat-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .chat-message {
