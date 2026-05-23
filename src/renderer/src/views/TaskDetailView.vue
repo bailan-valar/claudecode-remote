@@ -271,12 +271,19 @@ function scrollLogsToBottom() {
   })
 }
 
-// ── 监听tab切换和阶段选择，自动滚动到底部 ──
-watch([activeTab, selectedPhaseIndex], () => {
+// ── 监听tab切换、阶段选择和日志变化，自动滚动到底部 ──
+watch([activeTab, selectedPhaseIndex, () => selectedPhase.value?.status], () => {
   if (activeTab.value === 'logs') {
     scrollLogsToBottom()
   }
 })
+
+// ── 监听日志内容变化，自动滚动到底部 ──
+watch(() => task.value?.logs, () => {
+  if (activeTab.value === 'logs') {
+    scrollLogsToBottom()
+  }
+}, { deep: true })
 </script>
 
 <template>
