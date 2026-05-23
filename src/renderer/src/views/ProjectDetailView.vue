@@ -1240,7 +1240,7 @@ header .actions {
   }
 
   .chat-message.user .chat-bubble {
-    max-width: 95%;
+    max-width: 98%;
   }
 
   .chat-message.assistant .chat-bubble {
