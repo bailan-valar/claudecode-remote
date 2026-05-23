@@ -225,6 +225,20 @@ async function handleCreateSubtask(task?: Task) {
   await taskStore.fetch()
 }
 
+// ── 子任务操作 ──
+async function handleEditChildTask(childTaskId: string) {
+  router.push({ name: 'task-detail', params: { id: childTaskId } })
+}
+
+const deletingChildTaskId = ref<string | null>(null)
+
+async function handleDeleteChildTask(childTaskId: string) {
+  deletingChildTaskId.value = null
+  await taskStore.remove(childTaskId)
+  // 刷新任务列表
+  await taskStore.fetch()
+}
+
 // ── 复制 Session ID ──
 function copySessionId() {
   if (!task.value?.claudeSessionId) return
@@ -433,6 +447,8 @@ watch([activeTab, selectedPhaseIndex], () => {
           :key="ct._id"
           mode="compact"
           :task="ct"
+          @edit="handleEditChildTask"
+          @delete="deletingChildTaskId = $event"
         />
       </ul>
     </section>
@@ -517,6 +533,14 @@ watch([activeTab, selectedPhaseIndex], () => {
       :visible="showDeleteConfirm"
       @confirm="handleDelete"
       @cancel="showDeleteConfirm = false"
+    />
+
+    <ConfirmDialog
+      title="确认删除子任务"
+      message="删除子任务后不可恢复，确定要继续吗？"
+      :visible="deletingChildTaskId !== null"
+      @confirm="handleDeleteChildTask(deletingChildTaskId!)"
+      @cancel="deletingChildTaskId = null"
     />
   </div>
 </template>

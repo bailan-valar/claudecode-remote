@@ -163,6 +163,10 @@ function onDragEnd(e: DragEvent) {
         {{ task.title }}
       </RouterLink>
     </div>
+    <div class="compact-actions">
+      <button class="glass-button btn-edit" @click="emit('edit', task._id)">编辑</button>
+      <button class="glass-button danger btn-delete" @click="emit('delete', task._id)">删除</button>
+    </div>
   </li>
 </template>
 
@@ -349,12 +353,18 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item {
   padding: var(--space-md);
   list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
 }
 
 .task-compact-item .compact-row {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
 }
 
 .task-compact-item .compact-title {
@@ -366,6 +376,18 @@ function onDragEnd(e: DragEvent) {
 
 .task-compact-item .compact-title:hover {
   color: var(--color-accent);
+}
+
+.task-compact-item .compact-actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.task-compact-item .compact-actions .glass-button {
+  font-size: 0.75rem;
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 28px;
 }
 
 @keyframes pulse {
@@ -406,6 +428,22 @@ function onDragEnd(e: DragEvent) {
 
   .task-compact-item {
     padding: var(--space-sm) var(--space-md);
+    flex-wrap: wrap;
+  }
+
+  .task-compact-item .compact-row {
+    width: 100%;
+    margin-bottom: var(--space-xs);
+  }
+
+  .task-compact-item .compact-actions {
+    width: 100%;
+  }
+
+  .task-compact-item .compact-actions .glass-button {
+    flex: 1;
+    min-height: 36px;
+    font-size: 0.8125rem;
   }
 }
 </style>
