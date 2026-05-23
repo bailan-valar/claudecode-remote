@@ -34,6 +34,14 @@ describe('getAllowedNext', () => {
   test('closed has no next states', () => {
     expect(getAllowedNext('closed')).toEqual([])
   })
+  test('stopped can go to pending or plan_required depending on task type', () => {
+    expect(getAllowedNext('stopped', { isPlan: false })).toEqual([TASK_STATUS.PENDING])
+    expect(getAllowedNext('stopped', { isPlan: true })).toEqual([TASK_STATUS.PLAN_REQUIRED])
+  })
+  test('failed can go to developing or planning depending on task type', () => {
+    expect(getAllowedNext('failed', { isPlan: false })).toEqual([TASK_STATUS.DEVELOPING, TASK_STATUS.CLOSED])
+    expect(getAllowedNext('failed', { isPlan: true })).toEqual([TASK_STATUS.PLANNING, TASK_STATUS.CLOSED])
+  })
 })
 
 describe('STATUS_LABEL', () => {

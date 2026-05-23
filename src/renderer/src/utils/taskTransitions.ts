@@ -73,4 +73,5 @@ export const TRANSITION_LABEL: Record<string, string> = {
   completed: '完成',
   closed: '关闭',
   stopped: '停止',
+  failed: '重新执行',
 }
