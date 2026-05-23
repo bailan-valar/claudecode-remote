@@ -100,6 +100,22 @@ function statusText(phase: string): string {
           恢复
         </button>
       </div>
+      <div class="engine-provider">
+        <label>执行引擎</label>
+        <select
+          class="glass-input"
+          :value="engineStore.status.provider"
+          @change="engineStore.setProvider(($event.target as HTMLSelectElement).value)"
+        >
+          <option
+            v-for="p in engineStore.providers"
+            :key="p.provider"
+            :value="p.provider"
+          >
+            {{ p.name }}
+          </option>
+        </select>
+      </div>
       <div class="engine-concurrency">
         <label>并发数: {{ engineStore.status.concurrency }}</label>
         <input
@@ -233,6 +249,25 @@ function statusText(phase: string): string {
   display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
+}
+
+.engine-provider {
+  margin-top: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.engine-provider label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  min-width: 80px;
+  font-weight: 500;
+}
+
+.engine-provider select {
+  flex: 1;
+  min-width: 0;
 }
 
 .engine-concurrency {
