@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, onScopeDispose } from 'vue'
+import { apiClient } from '../api'
 
 export interface SyncStatus {
   phase: string
@@ -10,13 +11,13 @@ export interface SyncStatus {
 export const useSyncStore = defineStore('sync', () => {
   const status = ref<SyncStatus>({ phase: 'connecting' })
 
-  const off = window.api.onSyncStatus((s) => {
+  const off = apiClient.onSyncStatus((s) => {
     status.value = s
   })
   onScopeDispose(() => off())
 
   async function refresh() {
-    await window.api.refreshSync()
+    await apiClient.refreshSync()
   }
 
   return { status, refresh }

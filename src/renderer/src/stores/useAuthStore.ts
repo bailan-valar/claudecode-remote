@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { apiClient } from '../api'
 
 interface User {
   username: string
@@ -15,7 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     error.value = null
     try {
-      const result = await window.api.login(username, password)
+      const result = await apiClient.login(username, password)
       if (result.ok) currentUser.value = result.user
       else error.value = result.error
     } finally {
@@ -27,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     error.value = null
     try {
-      const result = await window.api.register(username, password)
+      const result = await apiClient.register(username, password)
       if (result.ok) {
         await login(username, password)
       } else {
@@ -39,12 +40,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    await window.api.logout()
+    await apiClient.logout()
     currentUser.value = null
   }
 
   async function checkSession() {
-    const result = await window.api.getSession()
+    const result = await apiClient.getSession()
     if (result.user) currentUser.value = result.user
   }
 
