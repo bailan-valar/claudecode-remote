@@ -6,6 +6,7 @@ import { AuthManager } from './auth'
 import { registerIpcHandlers } from './ipc'
 import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState } from './engineState'
+import { broadcast } from './events'
 
 let engine: TaskEngine | null = null
 
@@ -69,6 +70,13 @@ export const syncManager = new SyncManager({
       : undefined,
 })
 
+syncManager.on('status', (status) => {
+  broadcast('sync:status', status)
+  if (status.phase === 'error') {
+    console.error('[sync] error:', status.message)
+  }
+})
+
 export const authManager = new AuthManager({
   baseUrl: couchBaseUrl,
   adminAuth:
@@ -80,15 +88,27 @@ export const authManager = new AuthManager({
       : undefined,
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const win = createWindow()
   registerIpcHandlers(win)
+
+  // 启动 Web 服务器
+  try {
+    const { startWebServer } = await import('./webServer')
+    startWebServer()
+  } catch (err: any) {
+    console.error('[main] failed to start web server:', err.message)
+  }
 
   // 启动任务引擎（若用户已登录且上次未手动停止）
   const db = syncManager.getLocalDb()
   if (db) {
     const state = loadEngineState()
     engine = new TaskEngine({ db, concurrency: state.concurrency ?? 1, provider: state.provider })
+    engine.on('status', (status) => broadcast('engine:status', status))
+    engine.on('task:completed', (taskId, result) => broadcast('engine:task:completed', taskId, result))
+    engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
+    setEngine(engine)
     if (state.running) {
       engine.start()
     }
