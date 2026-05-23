@@ -9,7 +9,7 @@ import TaskForm from '../components/TaskForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { formatDuration } from '../utils/formatDuration'
 import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
-import { TASK_STATUS } from '../../../shared/constants'
+import { TASK_STATUS, KIND_LABEL } from '../../../shared/constants'
 import { STATUS_LABEL } from '../utils/taskTransitions'
 import type { Task } from '../../../shared/types'
 
@@ -153,6 +153,10 @@ async function handleDelete() {
             <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
           </select>
         </span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">类型</span>
+        <span class="info-value">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
       </div>
       <div class="info-row">
         <span class="info-label">描述</span>

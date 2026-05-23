@@ -147,7 +147,7 @@ export async function listTasksAction(projectId?: string) {
   return { ok: true, tasks }
 }
 
-export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority' | 'timeEntries' | 'totalDuration'> & { status?: Task['status']; priority?: Task['priority'] }) {
+export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority' | 'timeEntries' | 'totalDuration' | 'kind'> & { status?: Task['status']; priority?: Task['priority']; kind?: Task['kind'] }) {
   console.log('[api] task:create', (doc as any).title)
   const db = syncManager.getLocalDb()
   if (!db) return { ok: false, error: '未登录' }
@@ -163,6 +163,7 @@ export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' |
     type: 'task',
     status: doc.status || 'planned',
     priority: doc.priority || 'medium',
+    kind: doc.kind || 'task',
     logs: [],
     createdAt: now,
     updatedAt: now,

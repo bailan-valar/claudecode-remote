@@ -12,6 +12,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { formatDurationShort } from '../utils/formatDuration'
 import { calculateLiveDuration, isTracking } from '../utils/timeTracking'
+import { KIND_LABEL } from '../../../shared/constants'
 import type { TaskStatus } from '../../../shared/constants'
 
 const router = useRouter()
@@ -147,6 +148,7 @@ onUnmounted(() => {
         <li v-for="t in displayTasks" :key="t._id" class="task-item glass glass-hover">
           <div class="row">
             <StatusBadge :status="t.status" />
+            <span class="kind-badge">{{ KIND_LABEL[t.kind] ?? t.kind ?? '任务' }}</span>
             <RouterLink :to="{ name: 'task-detail', params: { id: t._id } }" class="title">
               {{ t.title }}
             </RouterLink>
@@ -245,6 +247,17 @@ header {
 .title:hover {
   color: var(--color-accent);
   opacity: 1;
+}
+
+.kind-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  border: 1px solid var(--glass-border-subtle);
 }
 
 .project {

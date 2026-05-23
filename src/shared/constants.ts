@@ -18,8 +18,25 @@ export const TASK_PRIORITY = {
   HIGH: 'high',
 } as const
 
+export const TASK_KIND = {
+  EPIC: 'epic',
+  REQUIREMENT: 'requirement',
+  STORY: 'story',
+  BUG: 'bug',
+  TASK: 'task',
+} as const
+
 export type TaskStatus = (typeof TASK_STATUS)[keyof typeof TASK_STATUS]
 export type TaskPriority = (typeof TASK_PRIORITY)[keyof typeof TASK_PRIORITY]
+export type TaskKind = (typeof TASK_KIND)[keyof typeof TASK_KIND]
+
+export const KIND_LABEL: Record<TaskKind, string> = {
+  epic: '史诗',
+  requirement: '需求',
+  story: '故事',
+  bug: '缺陷',
+  task: '任务',
+}
 
 export const ENGINE_PROVIDER = {
   CLAUDE: 'claude',

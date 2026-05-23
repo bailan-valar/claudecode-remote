@@ -85,7 +85,7 @@ async function handleTestWebhook() {
   }
   webhookTesting.value = true
   try {
-    const result = await (apiClient as any).testWebhook(url)
+    const result = await apiClient.testWebhook(url)
     if (result?.ok) {
       webhookTestMessage.value = { ok: true, text: '✅ 测试消息已发送，请在企业微信中查看' }
     } else {

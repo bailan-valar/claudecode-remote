@@ -1,4 +1,4 @@
-import type { TaskStatus, TaskPriority } from './constants'
+import type { TaskStatus, TaskPriority, TaskKind } from './constants'
 
 export interface BaseDoc {
   _id: string
@@ -33,6 +33,7 @@ export interface Task extends BaseDoc {
   prompt: string
   status: TaskStatus
   priority: TaskPriority
+  kind: TaskKind
   claudeSessionId?: string | null
   logs: Array<{
     timestamp: string

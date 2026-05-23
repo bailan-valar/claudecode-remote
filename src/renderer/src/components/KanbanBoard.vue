@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { TASK_STATUS, type TaskStatus } from '../../../shared/constants'
+import { TASK_STATUS, type TaskStatus, KIND_LABEL } from '../../../shared/constants'
 import type { Task } from '../../../shared/types'
 import { STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
 import { formatDurationShort } from '../utils/formatDuration'
@@ -101,6 +101,7 @@ function taskDuration(task: Task) {
             {{ task.title }}
           </RouterLink>
           <div class="card-meta">
+            <span class="kind">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
             <span class="project">{{ projectNameMap.get(task.projectId) ?? task.projectId }}</span>
             <span v-if="(task.totalDuration ?? 0) > 0 || isTracking(task)" class="duration" :class="{ 'duration-active': isTracking(task) }">
               {{ formatDurationShort(taskDuration(task)) }}
@@ -217,6 +218,16 @@ function taskDuration(task: Task) {
   align-items: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
+}
+
+.kind {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border-subtle);
 }
 
 .duration {

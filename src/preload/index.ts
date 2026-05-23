@@ -35,7 +35,7 @@ const api = {
 
   // === Tasks ===
   listTasks: (projectId?: string) => ipcRenderer.invoke('task:list', projectId),
-  createTask: (doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority'> & { status?: Task['status'] }) =>
+  createTask: (doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority' | 'kind'> & { status?: Task['status']; kind?: Task['kind'] }) =>
     ipcRenderer.invoke('task:create', doc),
   updateTask: (id: string, doc: Partial<Task>) =>
     ipcRenderer.invoke('task:update', id, doc),

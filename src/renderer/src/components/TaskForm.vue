@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useTaskStore } from '../stores/useTaskStore'
 import type { Project, Task } from '../../../shared/types'
-import { TASK_STATUS } from '../../../shared/constants'
+import { TASK_STATUS, TASK_KIND, KIND_LABEL } from '../../../shared/constants'
 import { STATUS_LABEL } from '../utils/taskTransitions'
 
 const props = defineProps<{
@@ -24,6 +24,7 @@ const prompt = ref('')
 const projectId = ref('')
 const parentTaskId = ref<string | null>(null)
 const status = ref<Task['status']>('planned')
+const kind = ref<Task['kind']>('task')
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -44,6 +45,7 @@ watch(() => props.initialTask, (t) => {
     projectId.value = t.projectId
     parentTaskId.value = t.parentTaskId ?? null
     status.value = t.status
+    kind.value = t.kind ?? 'task'
   } else if (props.defaultProjectId) {
     projectId.value = props.defaultProjectId
   }
@@ -58,6 +60,7 @@ async function handleSubmit() {
     if (projectId.value !== props.initialTask!.projectId) changes.projectId = projectId.value
     if (parentTaskId.value !== props.initialTask!.parentTaskId) changes.parentTaskId = parentTaskId.value
     if (status.value !== props.initialTask!.status) changes.status = status.value
+    if (kind.value !== (props.initialTask!.kind ?? 'task')) changes.kind = kind.value
     emit('submit', changes)
     return
   }
@@ -68,6 +71,7 @@ async function handleSubmit() {
     projectId: projectId.value,
     parentTaskId: parentTaskId.value ?? undefined,
     status: status.value,
+    kind: kind.value,
   })
   if (result.ok) {
     title.value = ''
@@ -76,6 +80,7 @@ async function handleSubmit() {
     projectId.value = ''
     parentTaskId.value = null
     status.value = 'planned'
+    kind.value = 'task'
     emit('submit')
   }
 }
@@ -94,6 +99,9 @@ async function handleSubmit() {
     </select>
     <select v-model="status" class="glass-input" required>
       <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
+    </select>
+    <select v-model="kind" class="glass-input" required>
+      <option v-for="k in Object.values(TASK_KIND)" :key="k" :value="k">{{ KIND_LABEL[k] }}</option>
     </select>
     <textarea v-model="description" class="glass-input" placeholder="描述（可选）" rows="2" />
     <textarea v-model="prompt" class="glass-input" placeholder="给 Claude Code 的 Prompt" rows="4" required />
