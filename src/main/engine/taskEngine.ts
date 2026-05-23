@@ -12,6 +12,15 @@ import { computeTimeTrackingChanges } from '../utils/taskTimeTracking'
 import type { Task } from '../../shared/types'
 import { TASK_STATUS } from '../../shared/constants'
 
+const DEFAULT_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${process.env.WEB_PORT || '3456'}`
+
+function buildTaskUrl(project: { siteUrl?: string }, taskId: string): string | undefined {
+  const base = project.siteUrl?.trim() || DEFAULT_BASE_URL
+  if (!base) return undefined
+  const cleanBase = base.replace(/\/$/, '')
+  return `${cleanBase}/#/tasks/${taskId}`
+}
+
 export interface EngineStatus {
   running: boolean
   runningCount: number
@@ -280,6 +289,7 @@ export class TaskEngine extends EventEmitter {
             logsCount: logs.length,
             commitMessage: commitResult.success ? commitResult.message : undefined,
             durationMs: totalSec * 1000,
+            taskUrl: buildTaskUrl(project, task._id),
           })
           void sendWecomMessage(project.webhookUrl, msg).then((res) => {
             if (!res.success) {
@@ -326,6 +336,7 @@ export class TaskEngine extends EventEmitter {
             prompt: task.prompt,
             error: result.error ?? '执行失败',
             durationMs: totalSec * 1000,
+            taskUrl: buildTaskUrl(project, task._id),
           })
           void sendWecomMessage(project.webhookUrl, failMsg).then((res) => {
             if (!res.success) {
@@ -361,6 +372,7 @@ export class TaskEngine extends EventEmitter {
           prompt: task.prompt,
           error: `异常: ${err.message}`,
           durationMs: totalSec * 1000,
+          taskUrl: buildTaskUrl(project, task._id),
         })
         void sendWecomMessage(project.webhookUrl, failMsg).catch(() => undefined)
       }

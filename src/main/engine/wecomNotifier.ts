@@ -63,6 +63,7 @@ export function buildTaskCompletedMarkdown(opts: {
   logsCount: number
   commitMessage?: string
   durationMs?: number
+  taskUrl?: string
 }): WecomMessage {
   const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
   const content = [
@@ -74,6 +75,7 @@ export function buildTaskCompletedMarkdown(opts: {
     durationStr ? `**耗时**: ${durationStr}` : '',
     `**日志条数**: ${opts.logsCount}`,
     opts.commitMessage ? `**Git Commit**: ${opts.commitMessage}` : '',
+    opts.taskUrl ? `**任务详情**: [点击查看](${opts.taskUrl})` : '',
     ``,
     `---`,
     `**Prompt 摘要**:`,
@@ -95,6 +97,7 @@ export function buildTaskFailedMarkdown(opts: {
   prompt: string
   error: string
   durationMs?: number
+  taskUrl?: string
 }): WecomMessage {
   const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
   const content = [
@@ -103,6 +106,7 @@ export function buildTaskFailedMarkdown(opts: {
     `**项目**: ${opts.projectName}`,
     `**任务**: ${opts.taskTitle}`,
     durationStr ? `**耗时**: ${durationStr}` : '',
+    opts.taskUrl ? `**任务详情**: [点击查看](${opts.taskUrl})` : '',
     ``,
     `**错误**:`,
     `> <font color="warning">${opts.error.slice(0, 500)}</font>`,

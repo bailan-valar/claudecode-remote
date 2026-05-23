@@ -40,6 +40,7 @@ const webhookUrl = ref('')
 const webhookEnabled = ref(false)
 const webhookNotifyOnFailure = ref(true)
 const webhookMentionedList = ref('')
+const siteUrl = ref('')
 const webhookTesting = ref(false)
 const webhookTestMessage = ref<{ ok: boolean; text: string } | null>(null)
 
@@ -59,6 +60,7 @@ watch(() => props.initialProject, (p) => {
     webhookEnabled.value = p.webhookEnabled ?? false
     webhookNotifyOnFailure.value = p.webhookNotifyOnFailure ?? true
     webhookMentionedList.value = p.webhookMentionedList?.join(',') ?? ''
+    siteUrl.value = p.siteUrl ?? ''
   }
 }, { immediate: true })
 
@@ -131,6 +133,7 @@ async function handleSubmit() {
     if (webhookNotifyOnFailure.value !== (props.initialProject!.webhookNotifyOnFailure ?? true)) changes.webhookNotifyOnFailure = webhookNotifyOnFailure.value
     const oldMentioned = props.initialProject!.webhookMentionedList?.join(',') ?? ''
     if (webhookMentionedList.value !== oldMentioned) changes.webhookMentionedList = mentioned.length > 0 ? mentioned : undefined
+    if (siteUrl.value !== (props.initialProject!.siteUrl ?? '')) changes.siteUrl = siteUrl.value || undefined
     emit('submit', changes)
     return
   }
@@ -144,6 +147,7 @@ async function handleSubmit() {
     webhookEnabled: webhookEnabled.value,
     webhookNotifyOnFailure: webhookNotifyOnFailure.value,
     webhookMentionedList: mentioned.length > 0 ? mentioned : undefined,
+    siteUrl: siteUrl.value || undefined,
   })
   if (result.ok) {
     name.value = ''
@@ -158,6 +162,7 @@ async function handleSubmit() {
     webhookEnabled.value = false
     webhookNotifyOnFailure.value = true
     webhookMentionedList.value = ''
+    siteUrl.value = ''
     emit('submit')
   }
 }
@@ -200,6 +205,13 @@ async function handleSubmit() {
         <input v-model="webhookEnabled" type="checkbox" />
         <span>任务完成后推送通知</span>
       </label>
+
+      <label>应用访问地址（用于通知中的任务链接）</label>
+      <input
+        v-model="siteUrl"
+        class="glass-input"
+        placeholder="如：http://192.168.1.100:3456 或 https://claude.example.com"
+      />
 
       <label>Webhook URL</label>
       <div class="webhook-url-row">

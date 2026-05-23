@@ -306,6 +306,10 @@ onUnmounted(() => {
           <span class="info-value mono">{{ project.llmConfig.model }}</span>
         </div>
         <div class="info-row">
+          <span class="info-label">应用访问地址</span>
+          <span class="info-value mono">{{ project.siteUrl || '未配置（默认 localhost）' }}</span>
+        </div>
+        <div class="info-row">
           <span class="info-label">企业微信通知</span>
           <span class="info-value">{{ project.webhookEnabled ? '已启用' : '未启用' }}</span>
         </div>

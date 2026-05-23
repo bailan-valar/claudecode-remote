@@ -22,6 +22,7 @@ export interface Project extends BaseDoc {
   webhookEnabled?: boolean
   webhookNotifyOnFailure?: boolean
   webhookMentionedList?: string[]
+  siteUrl?: string
   createdAt: string
   updatedAt: string
 }
