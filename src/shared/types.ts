@@ -66,9 +66,7 @@ export interface Task extends BaseDoc {
   result?: string
 }
 
-export interface ChatMessage {
-  _id?: string
-  _rev?: string
+export interface ChatMessage extends BaseDoc {
   type: 'chat-message'
   projectId: string
   role: 'user' | 'assistant'
@@ -83,9 +81,7 @@ export interface ChatMessage {
   status?: 'streaming' | 'done' | 'error'
 }
 
-export interface ChatSession {
-  _id?: string
-  _rev?: string
+export interface ChatSession extends BaseDoc {
   type: 'chat-session'
   projectId: string
   sessionId: string

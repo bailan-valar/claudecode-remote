@@ -496,13 +496,15 @@ function onDragEnd(e: DragEvent) {
 
 /* Compact mode */
 .task-compact-item {
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   list-style: none;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
+  min-height: 48px;
 }
 
 .task-compact-item:hover {
@@ -514,22 +516,26 @@ function onDragEnd(e: DragEvent) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 2px;
 }
 
 .task-compact-item .compact-row {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   min-width: 0;
 }
 
 .task-compact-item .compact-title {
   font-weight: 600;
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   color: var(--color-text);
   text-decoration: none;
   transition: color var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .task-compact-item .compact-title:hover {
@@ -539,16 +545,16 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: 4px;
   flex-wrap: wrap;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--color-text-secondary);
 }
 
 .task-compact-item .compact-meta .kind {
   font-weight: 600;
   background: rgba(0, 0, 0, 0.04);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: var(--radius-full);
   border: 1px solid var(--glass-border-subtle);
   transition: all var(--transition-fast);
@@ -561,14 +567,14 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta .project {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .task-compact-item .compact-meta .project::before {
   content: '';
   display: inline-block;
-  width: 3px;
-  height: 3px;
+  width: 2px;
+  height: 2px;
   background: currentColor;
   border-radius: 50%;
   opacity: 0.5;
@@ -577,7 +583,7 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta .duration {
   font-family: 'SF Mono', Monaco, monospace;
   background: rgba(0, 0, 0, 0.04);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
 }
@@ -594,15 +600,16 @@ function onDragEnd(e: DragEvent) {
 
 .task-compact-item .compact-actions {
   display: flex;
-  gap: var(--space-xs);
+  gap: 4px;
   flex-shrink: 0;
   align-items: flex-start;
 }
 
 .task-compact-item .compact-actions .glass-button {
-  font-size: 0.75rem;
-  padding: var(--space-xs) var(--space-sm);
-  min-height: 28px;
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  min-height: 24px;
+  min-width: 48px;
   transition: all var(--transition-fast);
 }
 
@@ -666,23 +673,36 @@ function onDragEnd(e: DragEvent) {
   }
 
   .task-compact-item {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-xs) var(--space-sm);
     flex-wrap: wrap;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
   }
 
   .task-compact-item .compact-main {
-    width: 100%;
+    width: calc(100% - 100px);
   }
 
   .task-compact-item .compact-actions {
-    width: 100%;
+    width: auto;
   }
 
   .task-compact-item .compact-actions .glass-button {
-    flex: 1;
-    min-height: 36px;
-    font-size: 0.8125rem;
+    flex: 0 0 auto;
+    min-height: 32px;
+    font-size: 0.75rem;
+    min-width: 40px;
+  }
+
+  .task-compact-item .compact-row {
+    flex-wrap: wrap;
+  }
+
+  .task-compact-item .compact-title {
+    font-size: 0.75rem;
+  }
+
+  .task-compact-item .compact-meta {
+    font-size: 0.625rem;
   }
 }
 </style>

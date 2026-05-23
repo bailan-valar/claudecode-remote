@@ -1,67 +1,82 @@
-import { createRepository } from './baseRepository'
+import { createRepository, BaseRepository } from './baseRepository'
 import type { ChatMessage, ChatSession } from '../../shared/types'
 
-export function createChatRepository(db: PouchDB.Database) {
+type ChatRepository = BaseRepository<ChatMessage> & {
+  findByProjectId: (projectId: string) => Promise<ChatMessage[]>
+  findBySessionId: (sessionId: string) => Promise<ChatMessage[]>
+  findLatestSession: (projectId: string) => Promise<ChatMessage | undefined>
+  deleteByProjectId: (projectId: string) => Promise<void>
+}
+
+export function createChatRepository(db: PouchDB.Database): ChatRepository {
   const repo = createRepository<ChatMessage>(db, 'chat-message')
-  
-  return {
-    ...repo,
+
+  const custom = {
     findByProjectId: async (projectId: string) => {
       const result = await db.find({
         selector: {
           type: 'chat-message',
-          projectId: projectId
+          projectId: projectId,
         },
-        sort: [{ timestamp: 'asc' }]
+        sort: [{ timestamp: 'asc' }],
       })
-      return result.docs
+      return result.docs as ChatMessage[]
     },
     findBySessionId: async (sessionId: string) => {
       const result = await db.find({
         selector: {
           type: 'chat-message',
-          sessionId: sessionId
+          sessionId: sessionId,
         },
-        sort: [{ timestamp: 'asc' }]
+        sort: [{ timestamp: 'asc' }],
       })
-      return result.docs
+      return result.docs as ChatMessage[]
     },
     findLatestSession: async (projectId: string) => {
       const result = await db.find({
         selector: {
           type: 'chat-message',
-          projectId: projectId
+          projectId: projectId,
         },
         sort: [{ timestamp: 'desc' }],
-        limit: 1
+        limit: 1,
       })
-      return result.docs[0] as ChatMessage | undefined
+      return (result.docs[0] as ChatMessage | undefined) ?? undefined
     },
     deleteByProjectId: async (projectId: string) => {
-      const messages = await repo.findByProjectId(projectId)
-      for (const message of messages) {
-        if (message._id && message._rev) {
-          await db.remove(message._id, message._rev)
+      const result = await db.find({
+        selector: { type: 'chat-message', projectId },
+      })
+      for (const doc of result.docs) {
+        if (doc._id && doc._rev) {
+          await db.remove(doc._id, doc._rev)
         }
       }
-    }
+    },
   }
+
+  return Object.assign(repo, custom) as ChatRepository
 }
 
-export function createChatSessionRepository(db: PouchDB.Database) {
+type ChatSessionRepository = BaseRepository<ChatSession> & {
+  findByProjectId: (projectId: string) => Promise<ChatSession[]>
+}
+
+export function createChatSessionRepository(db: PouchDB.Database): ChatSessionRepository {
   const repo = createRepository<ChatSession>(db, 'chat-session')
-  
-  return {
-    ...repo,
+
+  const custom = {
     findByProjectId: async (projectId: string) => {
       const result = await db.find({
         selector: {
           type: 'chat-session',
-          projectId: projectId
+          projectId: projectId,
         },
-        sort: [{ updatedAt: 'desc' }]
+        sort: [{ updatedAt: 'desc' }],
       })
-      return result.docs
-    }
+      return result.docs as ChatSession[]
+    },
   }
+
+  return Object.assign(repo, custom) as ChatSessionRepository
 }

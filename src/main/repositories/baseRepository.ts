@@ -1,5 +1,9 @@
 import type { BaseDoc } from '../../shared/types'
 
+export function createRepository<T extends BaseDoc>(db: PouchDB.Database, type: string) {
+  return new BaseRepository<T>(db, type)
+}
+
 export class BaseRepository<T extends BaseDoc> {
   constructor(
     private db: PouchDB.Database,

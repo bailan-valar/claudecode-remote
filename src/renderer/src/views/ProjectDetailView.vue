@@ -545,7 +545,7 @@ onUnmounted(() => {
             :task="t"
             :tick="tick"
             :show-priority="true"
-            mode="list"
+            mode="compact"
             @navigate="handleTaskNavigate"
             @transition="handleTaskTransition"
             @edit="handleTaskEdit"
@@ -819,7 +819,7 @@ header .actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   flex-wrap: wrap;
   gap: var(--space-sm);
 }
@@ -829,22 +829,18 @@ header .actions {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-xs);
 }
 
 /* 手机端更紧凑的间隔 */
 @media (max-width: 640px) {
   .task-list {
-    gap: var(--space-sm);
+    gap: 2px;
   }
 
   /* 为TaskListItem添加紧凑模式类 */
-  .task-list :deep(.task-list-item) {
-    padding: var(--space-sm) var(--space-md);
-  }
-
-  .task-list :deep(.task-list-item .row) {
-    margin-bottom: var(--space-xs);
+  .task-list :deep(.task-compact-item) {
+    padding: var(--space-xs) var(--space-sm);
   }
 }
 
