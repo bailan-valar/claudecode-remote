@@ -6,7 +6,7 @@ import { useProjectStore } from '../stores/useProjectStore'
 import StatusBadge from '../components/StatusBadge.vue'
 import TaskStatusActions from '../components/TaskStatusActions.vue'
 import TaskListItem from '../components/TaskListItem.vue'
-import TaskForm from '../components/TaskForm.vue'
+import TaskEditPanel from '../components/TaskEditPanel.vue'
 import TaskAppendPanel from '../components/TaskAppendPanel.vue'
 import TaskSubtaskPanel from '../components/TaskSubtaskPanel.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
@@ -145,7 +145,7 @@ async function handleDelete() {
 // ── 追加任务 ──
 async function handleAppend(content: string) {
   if (!task.value || !content.trim()) return
-  const newPrompt = task.value.prompt + '\n\n--- 追加 ---\n' + content.trim()
+  const newPrompt = (task.value.prompt || '') + '\n\n--- 追加 ---\n' + content.trim()
   const result = await taskStore.update(task.value._id, {
     prompt: newPrompt,
     status: TASK_STATUS.PENDING,
@@ -214,15 +214,12 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
       </div>
     </header>
 
-    <div v-if="isEditing" class="form-panel glass">
-      <TaskForm
-        :projects="projectStore.projects"
-        :initial-task="task"
-        mode="edit"
-        @submit="handleUpdate"
-        @cancel="isEditing = false"
-      />
-    </div>
+    <TaskEditPanel
+      v-model:editing="isEditing"
+      :task="task"
+      :projects="projectStore.projects"
+      @submit="handleUpdate"
+    />
 
     <!-- 追加任务面板 -->
     <div v-if="showAppendPanel" class="form-panel glass">
@@ -279,7 +276,8 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
       </div>
       <div class="info-row">
         <span class="info-label">Prompt</span>
-        <pre class="prompt-block">{{ task.prompt }}</pre>
+        <pre v-if="task.prompt" class="prompt-block">{{ task.prompt }}</pre>
+        <span v-else class="info-value">（空，执行时将使用标题）</span>
       </div>
       <div class="info-row">
         <span class="info-label">所属项目</span>
