@@ -39,6 +39,27 @@ const selectedPhaseIndex = ref(0)
 // 日志列表引用
 const logListRef = ref<HTMLElement | null>(null)
 
+// 控制是否隐藏工具调用（从本地存储读取偏好）
+const hideToolCalls = ref(localStorage.getItem('hideToolCalls') === 'true')
+
+// 监听变化，保存到本地存储
+watch(hideToolCalls, (newValue) => {
+  localStorage.setItem('hideToolCalls', String(newValue))
+})
+
+// 计算被隐藏的工具调用数量
+function getHiddenToolCallsCount(phase: StatusHistoryEntry) {
+  if (!task.value || !hideToolCalls.value) return 0
+  const start = new Date(phase.startedAt).getTime()
+  const end = phase.endedAt ? new Date(phase.endedAt).getTime() : Date.now()
+  return task.value.logs.filter((log) => {
+    const t = new Date(log.timestamp).getTime()
+    const inTimeRange = t >= start && t <= end
+    const isToolCall = log.message.trim().startsWith('[工具]')
+    return inTimeRange && isToolCall
+  }).length
+}
+
 // 追加任务
 const showAppendPanel = ref(false)
 
@@ -122,7 +143,10 @@ function getPhaseLogs(phase: StatusHistoryEntry) {
   const end = phase.endedAt ? new Date(phase.endedAt).getTime() : Date.now()
   return task.value.logs.filter((log) => {
     const t = new Date(log.timestamp).getTime()
-    return t >= start && t <= end
+    const inTimeRange = t >= start && t <= end
+    // 如果启用了隐藏工具调用，过滤掉以"[工具]"开头的日志
+    const notToolCall = !hideToolCalls.value || !log.message.trim().startsWith('[工具]')
+    return inTimeRange && notToolCall
   })
 }
 
@@ -500,7 +524,16 @@ watch(() => task.value?.logs, () => {
           </div>
           <div class="phase-detail-body">
             <template v-if="selectedPhase.status === 'developing' || selectedPhase.status === 'planning'">
-              <div class="content-label">{{ selectedPhase.status === 'planning' ? '计划执行日志' : '开发日志' }}</div>
+              <div class="content-label-with-control">
+	                <span class="content-label">{{ selectedPhase.status === 'planning' ? '计划执行日志' : '开发日志' }}</span>
+	                <label class="tool-call-filter">
+	                  <input type="checkbox" v-model="hideToolCalls" />
+	                  <span>隐藏工具调用</span>
+	                  <span v-if="hideToolCalls && getHiddenToolCallsCount(selectedPhase) > 0" class="hidden-count">
+	                    (已隐藏 {{ getHiddenToolCallsCount(selectedPhase) }} 条)
+	                  </span>
+	                </label>
+	              </div>
               <div v-if="getPhaseLogs(selectedPhase).length" ref="logListRef" class="log-list">
                 <div
                   v-for="(log, idx) in getPhaseLogs(selectedPhase)"
@@ -941,6 +974,40 @@ header .actions {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-bottom: var(--space-md);
+}
+
+.content-label-with-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.tool-call-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.tool-call-filter input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+}
+
+.tool-call-filter span {
+  line-height: 1;
+}
+
+.tool-call-filter .hidden-count {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .content-empty {

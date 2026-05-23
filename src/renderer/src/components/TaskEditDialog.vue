@@ -17,8 +17,6 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const isEditing = ref(false)
-
 const eligibleParentTasks = computed(() => {
   if (!props.defaultProjectId && !props.task) return []
   const currentProjectId = props.defaultProjectId || props.task?.projectId || ''
@@ -30,7 +28,9 @@ const eligibleParentTasks = computed(() => {
 })
 
 watch(() => props.visible, (newVal) => {
-  isEditing.value = newVal
+  if (!newVal) {
+    // 弹框关闭时重置表单状态
+  }
 })
 
 function handleSubmit(changes?: Partial<Task>) {
@@ -39,12 +39,10 @@ function handleSubmit(changes?: Partial<Task>) {
   } else {
     emit('submit', props.task, changes)
   }
-  isEditing.value = false
 }
 
 function handleCancel() {
   emit('cancel')
-  isEditing.value = false
 }
 </script>
 
