@@ -360,7 +360,7 @@ export class TaskEngine extends EventEmitter {
           updateData.planOutput = result.result ?? ''
         } else {
           const durationSeconds = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
-          const commitResult = await autoCommit(project.path, task.title, durationSeconds)
+          const commitResult = await autoCommit(project.path, task.title, durationSeconds, 'develop')
           const commitLog: LogEntry = {
             timestamp: new Date().toISOString(),
             level: commitResult.success ? 'info' : 'warn',

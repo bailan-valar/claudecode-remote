@@ -27,6 +27,7 @@ export async function autoCommit(
   projectPath: string,
   taskTitle: string,
   durationSeconds?: number,
+  taskType?: 'plan' | 'develop',
 ): Promise<GitCommitResult> {
   try {
     const git: SimpleGit = simpleGit(projectPath)
@@ -50,9 +51,14 @@ export async function autoCommit(
       typeof durationSeconds === 'number' && durationSeconds > 0
         ? formatDuration(durationSeconds)
         : ''
+
+    // 生成任务类型标签
+    const typeLabel = taskType === 'plan' ? '[计划]' : '[开发]'
+
+    // 优化后的提交信息格式：类型+标题+执行时长
     const commitMsg = durationText
-      ? `auto: complete task "${taskTitle}" (${durationText})`
-      : `auto: complete task "${taskTitle}"`
+      ? `${typeLabel} ${taskTitle} (${durationText})`
+      : `${typeLabel} ${taskTitle}`
 
     // 如果有变更，先添加到暂存区
     if (hasChanges) {
