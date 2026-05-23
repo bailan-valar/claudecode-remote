@@ -25,6 +25,7 @@ const projectId = ref('')
 const parentTaskId = ref<string | null>(null)
 const status = ref<Task['status']>('planned')
 const kind = ref<Task['kind']>('task')
+const isPlan = ref(false)
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -46,10 +47,24 @@ watch(() => props.initialTask, (t) => {
     parentTaskId.value = t.parentTaskId ?? null
     status.value = t.status
     kind.value = t.kind ?? 'task'
+    isPlan.value = t.isPlan ?? false
   } else if (props.defaultProjectId) {
     projectId.value = props.defaultProjectId
   }
 }, { immediate: true })
+
+watch(kind, (newKind, oldKind) => {
+  if (!isEdit.value && newKind === 'epic' && oldKind !== 'epic') {
+    isPlan.value = true
+    if (!isEdit.value) status.value = 'plan_required'
+  }
+})
+
+watch(isPlan, (val) => {
+  if (!isEdit.value) {
+    status.value = val ? 'plan_required' : 'planned'
+  }
+})
 
 async function handleSubmit() {
   if (isEdit.value) {
@@ -61,6 +76,7 @@ async function handleSubmit() {
     if (parentTaskId.value !== props.initialTask!.parentTaskId) changes.parentTaskId = parentTaskId.value
     if (status.value !== props.initialTask!.status) changes.status = status.value
     if (kind.value !== (props.initialTask!.kind ?? 'task')) changes.kind = kind.value
+    if (isPlan.value !== (props.initialTask!.isPlan ?? false)) changes.isPlan = isPlan.value
     emit('submit', changes)
     return
   }
@@ -72,6 +88,7 @@ async function handleSubmit() {
     parentTaskId: parentTaskId.value ?? undefined,
     status: status.value,
     kind: kind.value,
+    isPlan: isPlan.value,
   })
   if (result.ok) {
     title.value = ''
@@ -81,6 +98,7 @@ async function handleSubmit() {
     parentTaskId.value = null
     status.value = 'planned'
     kind.value = 'task'
+    isPlan.value = false
     emit('submit')
   }
 }
@@ -100,6 +118,10 @@ async function handleSubmit() {
     <select v-model="status" class="glass-input" required>
       <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
     </select>
+    <label class="plan-check">
+      <input v-model="isPlan" type="checkbox" />
+      <span>需要编写开发计划</span>
+    </label>
     <select v-model="kind" class="glass-input" required>
       <option v-for="k in Object.values(TASK_KIND)" :key="k" :value="k">{{ KIND_LABEL[k] }}</option>
     </select>
@@ -123,5 +145,20 @@ async function handleSubmit() {
   display: flex;
   gap: var(--space-sm);
   margin-top: var(--space-sm);
+}
+
+.plan-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.plan-check input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 </style>

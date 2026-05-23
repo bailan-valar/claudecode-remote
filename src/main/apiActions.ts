@@ -176,7 +176,7 @@ export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' |
   const task = await repo.create({
     ...doc,
     type: 'task',
-    status: doc.status || 'planned',
+    status: doc.status || (doc.isPlan ? 'plan_required' : 'planned'),
     priority: doc.priority || 'medium',
     kind: doc.kind || 'task',
     logs: [],

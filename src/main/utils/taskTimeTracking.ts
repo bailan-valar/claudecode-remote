@@ -17,15 +17,17 @@ export function computeTimeTrackingChanges(
   const lastEntry = entries[entries.length - 1]
   const isCurrentlyTracking = !!lastEntry && !lastEntry.endedAt
 
-  // 离开 developing：结束当前计时
-  if (isCurrentlyTracking && newStatus !== TASK_STATUS.DEVELOPING) {
+  const TRACKING_STATUSES: TaskStatus[] = [TASK_STATUS.DEVELOPING, TASK_STATUS.PLANNING]
+
+  // 离开 tracking 状态：结束当前计时
+  if (isCurrentlyTracking && !TRACKING_STATUSES.includes(newStatus)) {
     lastEntry.endedAt = now
     changes.timeEntries = entries
     changes.totalDuration = calculateTotalSeconds(entries)
   }
 
-  // 进入 developing：开始新计时（如果当前没有在计时）
-  if (newStatus === TASK_STATUS.DEVELOPING && !isCurrentlyTracking) {
+  // 进入 tracking 状态：开始新计时（如果当前没有在计时）
+  if (TRACKING_STATUSES.includes(newStatus) && !isCurrentlyTracking) {
     entries.push({ startedAt: now })
     changes.timeEntries = entries
   }

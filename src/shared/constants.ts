@@ -5,6 +5,9 @@ export const DOC_TYPE = {
 
 export const TASK_STATUS = {
   PLANNED: 'planned',
+  PLAN_REQUIRED: 'plan_required',
+  PLANNING: 'planning',
+  PLAN_REVIEWING: 'plan_reviewing',
   PENDING: 'pending',
   DEVELOPING: 'developing',
   REVIEWING: 'reviewing',

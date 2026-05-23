@@ -3,8 +3,17 @@ import { getAllowedNext, STATUS_LABEL } from '../taskTransitions'
 import { TASK_STATUS } from '../../../../shared/constants'
 
 describe('getAllowedNext', () => {
-  test('planned can only go to pending', () => {
-    expect(getAllowedNext('planned')).toEqual([TASK_STATUS.PENDING])
+  test('planned can go to plan_required or pending', () => {
+    expect(getAllowedNext('planned')).toEqual([TASK_STATUS.PLAN_REQUIRED, TASK_STATUS.PENDING])
+  })
+  test('plan_required can only go to planning', () => {
+    expect(getAllowedNext('plan_required')).toEqual([TASK_STATUS.PLANNING])
+  })
+  test('planning can only go to plan_reviewing', () => {
+    expect(getAllowedNext('planning')).toEqual([TASK_STATUS.PLAN_REVIEWING])
+  })
+  test('plan_reviewing can go to pending or closed', () => {
+    expect(getAllowedNext('plan_reviewing')).toEqual([TASK_STATUS.PENDING, TASK_STATUS.CLOSED])
   })
   test('pending can only go to developing', () => {
     expect(getAllowedNext('pending')).toEqual([TASK_STATUS.DEVELOPING])

@@ -35,6 +35,7 @@ const appendContent = ref('')
 const showSubtaskPanel = ref(false)
 const subtaskTitle = ref('')
 const subtaskPrompt = ref('')
+const showPlanFullscreen = ref(false)
 
 const childTasks = computed(() => {
   if (!task.value) return []
@@ -183,6 +184,16 @@ async function handleCreateSubtask() {
 <template>
   <div v-if="!task" class="loading">加载中...</div>
   <div v-else class="task-detail">
+    <!-- 计划全屏查看 -->
+    <div v-if="showPlanFullscreen" class="plan-fullscreen-overlay" @click.self="showPlanFullscreen = false">
+      <div class="plan-fullscreen-content glass-strong">
+        <div class="plan-fullscreen-header">
+          <h2>开发计划：{{ task.title }}</h2>
+          <button class="glass-button" @click="showPlanFullscreen = false">关闭</button>
+        </div>
+        <pre class="plan-fullscreen-body">{{ task.planOutput }}</pre>
+      </div>
+    </div>
     <header>
       <div class="header-left">
         <template v-if="!isEditingStatus">
@@ -261,6 +272,10 @@ async function handleCreateSubtask() {
         <span class="info-label">类型</span>
         <span class="info-value">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
       </div>
+      <div class="info-row">
+        <span class="info-label">计划任务</span>
+        <span class="info-value">{{ task.isPlan ? '是' : '否' }}</span>
+      </div>
       <div v-if="parentTask" class="info-row">
         <span class="info-label">父任务</span>
         <span class="info-value">
@@ -315,6 +330,16 @@ async function handleCreateSubtask() {
           :task="ct"
         />
       </ul>
+    </section>
+
+    <section v-if="task.planOutput" class="plan-output">
+      <h2 class="section-title">开发计划</h2>
+      <div class="plan-panel glass">
+        <pre class="plan-content">{{ task.planOutput }}</pre>
+        <div class="plan-actions">
+          <button class="glass-button primary" @click="showPlanFullscreen = true">全屏查看</button>
+        </div>
+      </div>
     </section>
 
     <section v-if="task.logs.length" class="logs">
@@ -569,6 +594,87 @@ header .actions {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+.plan-output {
+  margin-top: var(--space-2xl);
+}
+
+.plan-panel {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.plan-content {
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  margin: 0;
+  background: rgba(0, 0, 0, 0.04);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.plan-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plan-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+}
+
+.plan-fullscreen-content {
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.plan-fullscreen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.plan-fullscreen-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.plan-fullscreen-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  white-space: pre-wrap;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--color-text);
+  margin: 0;
+  background: transparent;
 }
 
 @media (max-width: 640px) {

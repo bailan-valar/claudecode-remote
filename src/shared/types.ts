@@ -37,6 +37,8 @@ export interface Task extends BaseDoc {
   status: TaskStatus
   priority: TaskPriority
   kind: TaskKind
+  isPlan?: boolean
+  planOutput?: string
   claudeSessionId?: string | null
   logs: Array<{
     timestamp: string

@@ -112,7 +112,7 @@ export class TaskEngine extends EventEmitter {
       .on('change', (change) => {
         const doc = change.doc as any
         if (!doc || doc.type !== 'task') return
-        if (doc.status === TASK_STATUS.PENDING) {
+        if (doc.status === TASK_STATUS.PENDING || doc.status === TASK_STATUS.PLAN_REQUIRED) {
           this._enqueue(doc as Task)
         }
       })
@@ -151,7 +151,7 @@ export class TaskEngine extends EventEmitter {
   private async _scanPending(): Promise<void> {
     const taskRepo = createTaskRepository(this.db)
     const tasks = await taskRepo.findAll()
-    const pending = tasks.filter((t) => t.status === TASK_STATUS.PENDING)
+    const pending = tasks.filter((t) => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PLAN_REQUIRED)
     for (const task of pending) {
       this._enqueue(task)
     }
@@ -196,13 +196,15 @@ export class TaskEngine extends EventEmitter {
     const projectRepo = createProjectRepository(this.db)
 
     const latestTask = await taskRepo.findById(task._id) ?? task
+    const isPlanTask = latestTask.isPlan === true
 
     const project = await projectRepo.findById(task.projectId)
     if (!project) {
       console.error('[engine] project not found:', task.projectId)
-      const timeChanges = computeTimeTrackingChanges(latestTask, TASK_STATUS.PENDING)
+      const errorStatus = isPlanTask ? TASK_STATUS.PLAN_REQUIRED : TASK_STATUS.PENDING
+      const timeChanges = computeTimeTrackingChanges(latestTask, errorStatus)
       await taskRepo.update(task._id, {
-        status: TASK_STATUS.PENDING,
+        status: errorStatus,
         reviewFeedback: '项目不存在',
         updatedAt: new Date().toISOString(),
         ...timeChanges,
@@ -219,9 +221,10 @@ export class TaskEngine extends EventEmitter {
       }
     }
 
-    const startTimeChanges = computeTimeTrackingChanges(latestTask, TASK_STATUS.DEVELOPING)
+    const startStatus = isPlanTask ? TASK_STATUS.PLANNING : TASK_STATUS.DEVELOPING
+    const startTimeChanges = computeTimeTrackingChanges(latestTask, startStatus)
     await taskRepo.update(task._id, {
-      status: TASK_STATUS.DEVELOPING,
+      status: startStatus,
       claudeSessionId: inheritedSessionId,
       updatedAt: new Date().toISOString(),
       ...startTimeChanges,
@@ -256,38 +259,47 @@ export class TaskEngine extends EventEmitter {
 
       if (result.success) {
         const currentTask = await taskRepo.findById(task._id) ?? latestTask
-        const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.REVIEWING)
-        const durationSeconds = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
-        const commitResult = await autoCommit(project.path, task.title, durationSeconds)
-        const commitLog: LogEntry = {
-          timestamp: new Date().toISOString(),
-          level: commitResult.success ? 'info' : 'warn',
-          message: commitResult.success
-            ? `[Git] ${commitResult.message}`
-            : `[Git] ${commitResult.error}`,
-        }
-        logs.push(commitLog)
+        const endStatus = isPlanTask ? TASK_STATUS.PLAN_REVIEWING : TASK_STATUS.REVIEWING
+        const endTimeChanges = computeTimeTrackingChanges(currentTask, endStatus)
 
-        await taskRepo.update(task._id, {
-          status: TASK_STATUS.REVIEWING,
+        const updateData: any = {
+          status: endStatus,
           claudeSessionId: result.sessionId ?? inheritedSessionId,
           logs,
-          completedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           ...endTimeChanges,
-        })
+        }
+
+        if (isPlanTask) {
+          updateData.planOutput = result.result ?? ''
+        } else {
+          const durationSeconds = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+          const commitResult = await autoCommit(project.path, task.title, durationSeconds)
+          const commitLog: LogEntry = {
+            timestamp: new Date().toISOString(),
+            level: commitResult.success ? 'info' : 'warn',
+            message: commitResult.success
+              ? `[Git] ${commitResult.message}`
+              : `[Git] ${commitResult.error}`,
+          }
+          logs.push(commitLog)
+          updateData.completedAt = new Date().toISOString()
+        }
+
+        await taskRepo.update(task._id, updateData)
 
         // 企业微信通知（非阻塞）
         if (project.webhookEnabled && project.webhookUrl) {
           const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+          const statusLabel = isPlanTask ? '计划待审核' : '待审核'
           const msg = buildTaskCompletedMarkdown({
             projectName: project.name,
             taskTitle: task.title,
             taskId: task._id,
-            status: '待审核',
+            status: statusLabel,
             prompt: task.prompt,
             logsCount: logs.length,
-            commitMessage: commitResult.success ? commitResult.message : undefined,
+            commitMessage: undefined,
             durationMs: totalSec * 1000,
             taskUrl: buildTaskUrl(project, task._id),
           })
@@ -303,7 +315,7 @@ export class TaskEngine extends EventEmitter {
           if (mentioned.length > 0) {
             const mentionMsg = buildMentionTextMessage(
               mentioned,
-              `任务「${task.title}」已开发完成，待审核`,
+              isPlanTask ? `任务「${task.title}」计划已编写完成，待审核` : `任务「${task.title}」已开发完成，待审核`,
             )
             void sendWecomMessage(project.webhookUrl, mentionMsg)
           }
@@ -312,9 +324,10 @@ export class TaskEngine extends EventEmitter {
         this.emit('task:completed', task._id, result)
       } else {
         const currentTask = await taskRepo.findById(task._id) ?? latestTask
-        const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.PENDING)
+        const errorStatus = isPlanTask ? TASK_STATUS.PLAN_REQUIRED : TASK_STATUS.PENDING
+        const endTimeChanges = computeTimeTrackingChanges(currentTask, errorStatus)
         await taskRepo.update(task._id, {
-          status: TASK_STATUS.PENDING,
+          status: errorStatus,
           reviewFeedback: result.error ?? '执行失败',
           claudeSessionId: result.sessionId ?? inheritedSessionId,
           logs,
@@ -349,9 +362,10 @@ export class TaskEngine extends EventEmitter {
       }
     } catch (err: any) {
       const currentTask = await taskRepo.findById(task._id) ?? latestTask
-      const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.PENDING)
+      const errorStatus = isPlanTask ? TASK_STATUS.PLAN_REQUIRED : TASK_STATUS.PENDING
+      const endTimeChanges = computeTimeTrackingChanges(currentTask, errorStatus)
       await taskRepo.update(task._id, {
-        status: TASK_STATUS.PENDING,
+        status: errorStatus,
         reviewFeedback: `异常: ${err.message}`,
         logs,
         updatedAt: new Date().toISOString(),
