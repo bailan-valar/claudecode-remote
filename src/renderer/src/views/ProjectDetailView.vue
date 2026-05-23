@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted } from 'vue'
+import { onMounted, ref, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
@@ -10,7 +10,9 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { formatDurationShort } from '../utils/formatDuration'
 import { calculateLiveDuration, isTracking } from '../utils/timeTracking'
 import { KIND_LABEL } from '../../../shared/constants'
+import { apiClient } from '../api/index'
 import type { Project, Task } from '../../../shared/types'
+import type { LogEntry } from '../../../main/engine/runner'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,7 +24,7 @@ const project = ref<Project | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const showCreateTask = ref(false)
-const activeTab = ref<'info' | 'tasks'>('info')
+const activeTab = ref<'info' | 'tasks' | 'chat'>('info')
 const tick = ref(0)
 let timerId: ReturnType<typeof setInterval> | null = null
 
@@ -105,6 +107,129 @@ async function handleDeleteTask(taskId: string) {
   deletingTaskId.value = null
   await taskStore.remove(taskId)
 }
+
+// ── Claude Chat ──
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  logs: LogEntry[]
+  timestamp: string
+  status: 'streaming' | 'done' | 'error'
+}
+
+const chatMessages = ref<ChatMessage[]>([])
+const chatInput = ref('')
+const chatLoading = ref(false)
+const chatSessionId = ref<string | undefined>(undefined)
+const chatContainerRef = ref<HTMLElement | null>(null)
+let chatLogUnsubscribe: (() => void) | null = null
+let chatDoneUnsubscribe: (() => void) | null = null
+
+function scrollChatToBottom() {
+  nextTick(() => {
+    if (chatContainerRef.value) {
+      chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight
+    }
+  })
+}
+
+function handleChatLog(entry: LogEntry) {
+  const lastMsg = chatMessages.value[chatMessages.value.length - 1]
+  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+    lastMsg.logs.push(entry)
+    scrollChatToBottom()
+  }
+}
+
+function handleChatDone(result: any) {
+  // Promise handler already updates state; this is a fallback for SSE
+  const lastMsg = chatMessages.value[chatMessages.value.length - 1]
+  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
+    if (result?.success) {
+      lastMsg.status = 'done'
+      lastMsg.content = result.result || '（无输出）'
+      if (result.sessionId) {
+        chatSessionId.value = result.sessionId
+      }
+    } else {
+      lastMsg.status = 'error'
+      lastMsg.content = result?.error || '对话失败'
+    }
+    chatLoading.value = false
+    scrollChatToBottom()
+  }
+}
+
+async function handleSendChat() {
+  const message = chatInput.value.trim()
+  if (!message || chatLoading.value || !project.value) return
+
+  chatMessages.value.push({
+    id: Date.now().toString() + '_u',
+    role: 'user',
+    content: message,
+    logs: [],
+    timestamp: new Date().toISOString(),
+    status: 'done',
+  })
+  chatInput.value = ''
+  scrollChatToBottom()
+
+  const assistantMsg: ChatMessage = {
+    id: Date.now().toString() + '_a',
+    role: 'assistant',
+    content: '',
+    logs: [],
+    timestamp: new Date().toISOString(),
+    status: 'streaming',
+  }
+  chatMessages.value.push(assistantMsg)
+  scrollChatToBottom()
+
+  chatLoading.value = true
+
+  try {
+    const result = await apiClient.chatWithClaude(project.value._id, message, chatSessionId.value)
+    if (result.ok && result.success) {
+      assistantMsg.status = 'done'
+      assistantMsg.content = result.result || '（无输出）'
+      if (result.sessionId) {
+        chatSessionId.value = result.sessionId
+      }
+    } else {
+      assistantMsg.status = 'error'
+      assistantMsg.content = result.error || '对话失败'
+    }
+  } catch (err: any) {
+    assistantMsg.status = 'error'
+    assistantMsg.content = err.message || '请求异常'
+  } finally {
+    chatLoading.value = false
+    scrollChatToBottom()
+  }
+}
+
+function clearChat() {
+  chatMessages.value = []
+  chatSessionId.value = undefined
+}
+
+onMounted(() => {
+  project.value = projectStore.projects.find((p) => p._id === projectId)
+  if (!project.value) projectStore.fetch()
+  taskStore.fetch(projectId)
+  startTick()
+
+  chatLogUnsubscribe = apiClient.onClaudeChatLog(handleChatLog)
+  chatDoneUnsubscribe = apiClient.onClaudeChatDone(handleChatDone)
+})
+
+onUnmounted(() => {
+  stopTick()
+  chatLogUnsubscribe?.()
+  chatDoneUnsubscribe?.()
+})
 </script>
 
 <template>
@@ -144,6 +269,13 @@ async function handleDeleteTask(taskId: string) {
           @click="activeTab = 'tasks'"
         >
           任务列表（{{ taskStore.filteredTasks.length }}）
+        </button>
+        <button
+          class="tab-button"
+          :class="{ active: activeTab === 'chat' }"
+          @click="activeTab = 'chat'"
+        >
+          Claude 对话
         </button>
       </div>
 
@@ -244,6 +376,64 @@ async function handleDeleteTask(taskId: string) {
           </li>
         </ul>
         <p v-else class="empty">该项目暂无任务</p>
+      </section>
+
+      <!-- Claude 对话 -->
+      <section v-show="activeTab === 'chat'" class="chat">
+        <div class="chat-toolbar">
+          <button class="glass-button" @click="clearChat">新对话</button>
+          <span v-if="chatSessionId" class="session-hint">已恢复会话</span>
+        </div>
+        <div ref="chatContainerRef" class="chat-container glass">
+          <div v-if="!chatMessages.length" class="chat-empty">
+            <p>在此直接与 Claude 对话，支持项目上下文和工具调用。</p>
+          </div>
+          <div
+            v-for="msg in chatMessages"
+            :key="msg.id"
+            :class="['chat-message', msg.role]"
+          >
+            <div class="chat-bubble">
+              <div v-if="msg.role === 'user'" class="chat-text">{{ msg.content }}</div>
+              <div v-else>
+                <div v-if="msg.status === 'streaming'" class="chat-streaming">
+                  <div
+                    v-for="(log, idx) in msg.logs"
+                    :key="idx"
+                    :class="['log-line', log.level]"
+                  >
+                    <span class="log-time">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                    <pre class="log-msg">{{ log.message }}</pre>
+                  </div>
+                  <span v-if="chatLoading" class="typing-indicator">思考中…</span>
+                </div>
+                <div v-else-if="msg.status === 'error'" class="chat-error">
+                  {{ msg.content }}
+                </div>
+                <div v-else class="chat-text">
+                  <pre>{{ msg.content }}</pre>
+                </div>
+              </div>
+            </div>
+            <span class="chat-time">{{ new Date(msg.timestamp).toLocaleTimeString() }}</span>
+          </div>
+        </div>
+        <div class="chat-input-panel glass">
+          <textarea
+            v-model="chatInput"
+            class="chat-input"
+            rows="2"
+            placeholder="输入消息，按 Ctrl+Enter 发送…"
+            @keydown.ctrl.enter.prevent="handleSendChat"
+          />
+          <button
+            class="glass-button primary"
+            :disabled="chatLoading || !chatInput.trim()"
+            @click="handleSendChat"
+          >
+            {{ chatLoading ? '发送中…' : '发送' }}
+          </button>
+        </div>
       </section>
     </template>
 
@@ -503,6 +693,162 @@ header .actions {
   font-size: 0.9375rem;
 }
 
+/* ── Claude 对话 ── */
+.chat-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.session-hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.chat-container {
+  max-height: 480px;
+  min-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.chat-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--space-2xl);
+  font-size: 0.9375rem;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.chat-message.user {
+  align-items: flex-end;
+}
+
+.chat-message.assistant {
+  align-items: flex-start;
+}
+
+.chat-bubble {
+  max-width: 80%;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.chat-message.user .chat-bubble {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.chat-message.assistant .chat-bubble {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--color-text);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.chat-text pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.chat-streaming .log-line {
+  margin-bottom: var(--space-sm);
+  font-size: 0.8125rem;
+}
+
+.chat-streaming .log-line:last-child {
+  margin-bottom: 0;
+}
+
+.chat-streaming .log-time {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-right: var(--space-sm);
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.chat-streaming .log-msg {
+  white-space: pre-wrap;
+  margin: 0.25rem 0 0 0;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+.chat-streaming .log-line.error .log-msg {
+  color: var(--color-error);
+}
+
+.typing-indicator {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-top: var(--space-sm);
+  display: inline-block;
+  animation: pulse 1.5s infinite;
+}
+
+.chat-error {
+  color: var(--color-error);
+  font-size: 0.9375rem;
+}
+
+.chat-time {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.chat-input-panel {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  align-items: flex-end;
+}
+
+.chat-input {
+  flex: 1;
+  resize: vertical;
+  min-height: 44px;
+  max-height: 120px;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-text);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.chat-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+}
+
+.chat-input-panel .glass-button {
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-lg);
+}
+
 @media (max-width: 640px) {
   .task-item {
     padding: var(--space-md);
@@ -518,6 +864,20 @@ header .actions {
     padding: var(--space-sm) var(--space-md);
     flex: 1;
     min-height: 40px;
+  }
+
+  .chat-bubble {
+    max-width: 92%;
+  }
+
+  .chat-input-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-input-panel .glass-button {
+    width: 100%;
+    min-height: 44px;
   }
 }
 </style>

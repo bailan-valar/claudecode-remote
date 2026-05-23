@@ -105,6 +105,12 @@ const httpApi: Api = {
   selectDirectory: () => Promise.resolve({ ok: false, error: '浏览器不支持系统目录选择' }),
 
   testWebhook: (webhookUrl) => httpInvoke('POST', '/api/webhook/test', { webhookUrl }),
+
+  chatWithClaude: (projectId, message, sessionId?) =>
+    httpInvoke('POST', '/api/claude/chat', { projectId, message, sessionId }),
+  abortClaudeChat: () => Promise.resolve({ ok: false, error: 'Web 端暂不支持中断' }),
+  onClaudeChatLog: (cb) => registerSseListener('claude:chat:log', cb),
+  onClaudeChatDone: (cb) => registerSseListener('claude:chat:done', cb),
 }
 
 export const apiClient: Api = isElectron ? (window as any).api : httpApi

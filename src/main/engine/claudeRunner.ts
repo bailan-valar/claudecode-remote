@@ -13,7 +13,7 @@ function buildEnv(project: Project): NodeJS.ProcessEnv {
   return env
 }
 
-function buildArgs(task: Task, project: Project, resumeSessionId?: string): string[] {
+function buildArgs(prompt: string, project: Project, resumeSessionId?: string): string[] {
   const args: string[] = [
     '-p',
     '--output-format', 'stream-json',
@@ -24,22 +24,25 @@ function buildArgs(task: Task, project: Project, resumeSessionId?: string): stri
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId)
   }
-  args.push(task.prompt)
+  args.push(prompt)
   return args
 }
 
-function runClaudeTask(
-  task: Task,
-  project: Project,
-  options?: RunOptions,
-): Promise<RunResult> {
+interface RunClaudeOptions {
+  project: Project
+  prompt: string
+  resumeSessionId?: string
+  onLog?: (entry: LogEntry) => void
+  abortSignal?: AbortSignal
+}
+
+function runClaude(options: RunClaudeOptions): Promise<RunResult> {
   return new Promise((resolve) => {
-    const resumeSessionId = task.claudeSessionId ?? undefined
-    const args = buildArgs(task, project, resumeSessionId)
-    const env = buildEnv(project)
+    const args = buildArgs(options.prompt, options.project, options.resumeSessionId)
+    const env = buildEnv(options.project)
 
     const child = spawn('claude', args, {
-      cwd: project.path,
+      cwd: options.project.path,
       env,
       shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -134,6 +137,35 @@ function runClaudeTask(
         sessionId: capturedSessionId,
       })
     })
+  })
+}
+
+function runClaudeTask(
+  task: Task,
+  project: Project,
+  options?: RunOptions,
+): Promise<RunResult> {
+  return runClaude({
+    project,
+    prompt: task.prompt,
+    resumeSessionId: task.claudeSessionId ?? undefined,
+    onLog: options?.onLog,
+    abortSignal: options?.abortSignal,
+  })
+}
+
+export function runClaudeChat(
+  project: Project,
+  message: string,
+  resumeSessionId?: string,
+  options?: RunOptions,
+): Promise<RunResult> {
+  return runClaude({
+    project,
+    prompt: message,
+    resumeSessionId,
+    onLog: options?.onLog,
+    abortSignal: options?.abortSignal,
   })
 }
 

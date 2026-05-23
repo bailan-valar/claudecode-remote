@@ -4,6 +4,7 @@ import { createReadStream } from 'fs'
 import { join, extname } from 'path'
 import { mainEvents } from './events'
 import * as api from './apiActions'
+import type { LogEntry } from './engine/runner'
 
 const PORT = parseInt(process.env.WEB_PORT || '3456', 10)
 const STATIC_DIR = join(__dirname, '../renderer')
@@ -109,6 +110,8 @@ mainEvents.on('sync:status', (status) => broadcastToSse('sync:status', status))
 mainEvents.on('engine:status', (status) => broadcastToSse('engine:status', status))
 mainEvents.on('engine:task:completed', (taskId, result) => broadcastToSse('engine:task:completed', taskId, result))
 mainEvents.on('engine:task:failed', (taskId, error) => broadcastToSse('engine:task:failed', taskId, error))
+mainEvents.on('claude:chat:log', (entry: LogEntry) => broadcastToSse('claude:chat:log', entry))
+mainEvents.on('claude:chat:done', (result: any) => broadcastToSse('claude:chat:done', result))
 
 export function startWebServer(): void {
   const server = createServer(async (req, res) => {
@@ -263,6 +266,13 @@ export function startWebServer(): void {
         // Webhook
         if (pathname === '/api/webhook/test' && req.method === 'POST') {
           const result = await api.testWebhookAction(body.webhookUrl)
+          sendJson(res, 200, result)
+          return
+        }
+
+        // Claude Chat
+        if (pathname === '/api/claude/chat' && req.method === 'POST') {
+          const result = await api.chatWithClaudeAction(body.projectId, body.message, body.sessionId)
           sendJson(res, 200, result)
           return
         }

@@ -8,7 +8,9 @@ import { computeTimeTrackingChanges } from './utils/taskTimeTracking'
 import type { TimeEntry } from './utils/taskTimeTracking'
 import { broadcast } from './events'
 import { sendWecomMessage, buildTestMessage } from './engine/wecomNotifier'
+import { runClaudeChat } from './engine/claudeRunner'
 import type { Project, Task } from '../shared/types'
+import type { LogEntry } from './engine/runner'
 
 function setupEngine(db: PouchDB.Database, options: { concurrency?: number; provider?: string }): TaskEngine {
   const oldEngine = getEngine()
@@ -291,4 +293,47 @@ export async function testWebhookAction(webhookUrl: string) {
   }
   console.error('[api] webhook:test failed:', result.error)
   return { ok: false, error: result.error || '发送失败' }
+}
+
+// === Claude Chat ===
+
+const chatControllers = new Map<string, AbortController>()
+
+export async function chatWithClaudeAction(projectId: string, message: string, sessionId?: string) {
+  console.log('[api] claude:chat', projectId, message.slice(0, 60))
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+  const repo = createProjectRepository(db)
+  const project = await repo.findById(projectId)
+  if (!project) return { ok: false, error: '项目不存在' }
+
+  const controller = new AbortController()
+  const chatId = Math.random().toString(36).slice(2)
+  chatControllers.set(chatId, controller)
+
+  try {
+    const result = await runClaudeChat(project, message, sessionId, {
+      onLog: (entry: LogEntry) => {
+        broadcast('claude:chat:log', entry)
+      },
+      abortSignal: controller.signal,
+    })
+    broadcast('claude:chat:done', { chatId, ...result })
+    return { ok: true, chatId, ...result }
+  } catch (err: any) {
+    return { ok: false, error: err.message || '对话失败' }
+  } finally {
+    chatControllers.delete(chatId)
+  }
+}
+
+export function abortClaudeChatAction(chatId?: string) {
+  if (chatId) {
+    chatControllers.get(chatId)?.abort()
+  } else {
+    for (const [, ctrl] of chatControllers) {
+      ctrl.abort()
+    }
+  }
+  return { ok: true }
 }

@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow, dialog } from 'electron'
 import { syncManager } from './index'
 import * as api from './apiActions'
 import { mainEvents } from './events'
+import type { LogEntry } from './engine/runner'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   // --- Broadcast to renderer window ---
@@ -15,6 +16,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
   mainEvents.on('engine:status', (status) => sendToWin('engine:status', status))
   mainEvents.on('engine:task:completed', (taskId, result) => sendToWin('engine:task:completed', taskId, result))
   mainEvents.on('engine:task:failed', (taskId, error) => sendToWin('engine:task:failed', taskId, error))
+  mainEvents.on('claude:chat:log', (entry: LogEntry) => sendToWin('claude:chat:log', entry))
+  mainEvents.on('claude:chat:done', (result: any) => sendToWin('claude:chat:done', result))
 
   // --- Sync handlers ---
   ipcMain.removeHandler('sync:refresh')
@@ -97,6 +100,18 @@ export function registerIpcHandlers(win: BrowserWindow) {
 
   ipcMain.removeHandler('engine:setProvider')
   ipcMain.handle('engine:setProvider', async (_, name: string) => api.setEngineProviderAction(name))
+
+  // --- Claude Chat handlers ---
+  ipcMain.removeHandler('claude:chat')
+  ipcMain.handle('claude:chat', async (_, projectId: string, message: string, sessionId?: string) => {
+    return api.chatWithClaudeAction(projectId, message, sessionId)
+  })
+
+  ipcMain.removeHandler('claude:chat:abort')
+  ipcMain.handle('claude:chat:abort', async () => {
+    api.abortClaudeChatAction()
+    return { ok: true }
+  })
 
   // --- Webhook handlers ---
   ipcMain.removeHandler('webhook:test')

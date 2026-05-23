@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Project, Task } from '../shared/types'
+import type { LogEntry } from '../main/engine/runner'
 
 export type SyncStatus =
   | { phase: 'idle' }
@@ -65,6 +66,21 @@ const api = {
     const listener = (_: unknown, taskId: string, error: string) => cb(taskId, error)
     ipcRenderer.on('engine:task:failed', listener)
     return () => { ipcRenderer.off('engine:task:failed', listener) }
+  },
+
+  // === Claude Chat ===
+  chatWithClaude: (projectId: string, message: string, sessionId?: string) =>
+    ipcRenderer.invoke('claude:chat', projectId, message, sessionId),
+  abortClaudeChat: () => ipcRenderer.invoke('claude:chat:abort'),
+  onClaudeChatLog: (cb: (entry: LogEntry) => void): (() => void) => {
+    const listener = (_: unknown, entry: LogEntry) => cb(entry)
+    ipcRenderer.on('claude:chat:log', listener)
+    return () => { ipcRenderer.off('claude:chat:log', listener) }
+  },
+  onClaudeChatDone: (cb: (result: any) => void): (() => void) => {
+    const listener = (_: unknown, result: any) => cb(result)
+    ipcRenderer.on('claude:chat:done', listener)
+    return () => { ipcRenderer.off('claude:chat:done', listener) }
   },
 
   // === Dialog ===
