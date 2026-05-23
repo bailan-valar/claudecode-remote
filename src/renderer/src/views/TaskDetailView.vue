@@ -108,7 +108,7 @@ async function handleDelete() {
     <header>
       <div class="header-left">
         <template v-if="!isEditingStatus">
-          <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus" />
+          <StatusBadge :status="task.status" :class="['status-editable', { disabled: isEditing }]" @click="!isEditing && startEditStatus()" />
         </template>
         <select
           v-else
@@ -142,7 +142,7 @@ async function handleDelete() {
         <span class="info-label">状态</span>
         <span class="info-value">
           <template v-if="!isEditingStatus">
-            <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus" />
+            <StatusBadge :status="task.status" :class="['status-editable', { disabled: isEditing }]" @click="!isEditing && startEditStatus()" />
           </template>
           <select
             v-else
@@ -315,6 +315,11 @@ header .actions {
 .status-editable:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.status-editable.disabled {
+  cursor: default;
+  pointer-events: none;
 }
 
 .status-select {
