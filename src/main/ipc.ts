@@ -98,6 +98,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.removeHandler('engine:setProvider')
   ipcMain.handle('engine:setProvider', async (_, name: string) => api.setEngineProviderAction(name))
 
+  // --- Webhook handlers ---
+  ipcMain.removeHandler('webhook:test')
+  ipcMain.handle('webhook:test', async (_, webhookUrl: string) => api.testWebhookAction(webhookUrl))
+
   // --- Dialog handlers ---
   ipcMain.removeHandler('dialog:openDirectory')
   ipcMain.handle('dialog:openDirectory', async () => {

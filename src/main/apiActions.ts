@@ -7,6 +7,7 @@ import { listRunners } from './engine/runnerRegistry'
 import { computeTimeTrackingChanges } from './utils/taskTimeTracking'
 import type { TimeEntry } from './utils/taskTimeTracking'
 import { broadcast } from './events'
+import { sendWecomMessage, buildTestMessage } from './engine/wecomNotifier'
 import type { Project, Task } from '../shared/types'
 
 function setupEngine(db: PouchDB.Database, options: { concurrency?: number; provider?: string }): TaskEngine {
@@ -273,4 +274,20 @@ export async function setEngineProviderAction(name: string) {
     saveEngineState({ running: state.running, concurrency: state.concurrency, provider: name })
   }
   return { ok: true }
+}
+
+// === Webhook ===
+
+export async function testWebhookAction(webhookUrl: string) {
+  console.log('[api] webhook:test', webhookUrl ? webhookUrl.slice(0, 60) + '...' : '(empty)')
+  if (!webhookUrl) {
+    return { ok: false, error: 'Webhook URL 为空' }
+  }
+  const result = await sendWecomMessage(webhookUrl, buildTestMessage())
+  if (result.success) {
+    console.log('[api] webhook:test ok')
+    return { ok: true }
+  }
+  console.error('[api] webhook:test failed:', result.error)
+  return { ok: false, error: result.error || '发送失败' }
 }

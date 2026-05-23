@@ -38,6 +38,8 @@ const llmModel = ref('')
 const allowedTools = ref('Read,Edit,Bash')
 const webhookUrl = ref('')
 const webhookEnabled = ref(false)
+const webhookTesting = ref(false)
+const webhookTestMessage = ref<{ ok: boolean; text: string } | null>(null)
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -71,6 +73,28 @@ async function handleSelectDirectory() {
   const result = await apiClient.selectDirectory()
   if (result.ok && result.path) {
     path.value = result.path
+  }
+}
+
+async function handleTestWebhook() {
+  webhookTestMessage.value = null
+  const url = webhookUrl.value.trim()
+  if (!url) {
+    webhookTestMessage.value = { ok: false, text: '请先填写 Webhook URL' }
+    return
+  }
+  webhookTesting.value = true
+  try {
+    const result = await (apiClient as any).testWebhook(url)
+    if (result?.ok) {
+      webhookTestMessage.value = { ok: true, text: '✅ 测试消息已发送，请在企业微信中查看' }
+    } else {
+      webhookTestMessage.value = { ok: false, text: `❌ 发送失败：${result?.error || '未知错误'}` }
+    }
+  } catch (err: any) {
+    webhookTestMessage.value = { ok: false, text: `❌ 发送异常：${err.message || err}` }
+  } finally {
+    webhookTesting.value = false
   }
 }
 
@@ -166,12 +190,25 @@ async function handleSubmit() {
       </label>
 
       <label>Webhook URL</label>
-      <input
-        v-model="webhookUrl"
-        class="glass-input"
-        placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."
-        :disabled="!webhookEnabled"
-      />
+      <div class="webhook-url-row">
+        <input
+          v-model="webhookUrl"
+          class="glass-input"
+          placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."
+          :disabled="!webhookEnabled"
+        />
+        <button
+          type="button"
+          class="glass-button"
+          :disabled="!webhookEnabled || !webhookUrl || webhookTesting"
+          @click="handleTestWebhook"
+        >
+          {{ webhookTesting ? '测试中...' : '发送测试' }}
+        </button>
+      </div>
+      <p v-if="webhookTestMessage" class="test-result" :class="{ ok: webhookTestMessage.ok, err: !webhookTestMessage.ok }">
+        {{ webhookTestMessage.text }}
+      </p>
       <p class="hint">在项目中的任务开发完成（进入待审核）时，向企业微信机器人推送 Markdown 消息。</p>
     </fieldset>
 
@@ -261,6 +298,35 @@ async function handleSubmit() {
 .webhook-config .glass-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.webhook-url-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+
+.webhook-url-row .glass-input {
+  flex: 1;
+  margin-bottom: 0 !important;
+}
+
+.test-result {
+  font-size: 0.8125rem;
+  margin-top: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
+.test-result.ok {
+  color: #2e7d32;
+  background: rgba(76, 175, 80, 0.08);
+}
+
+.test-result.err {
+  color: #c62828;
+  background: rgba(244, 67, 54, 0.08);
 }
 
 .toggle-label {

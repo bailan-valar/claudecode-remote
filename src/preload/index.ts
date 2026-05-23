@@ -69,6 +69,9 @@ const api = {
 
   // === Dialog ===
   selectDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
+
+  // === Webhook ===
+  testWebhook: (webhookUrl: string) => ipcRenderer.invoke('webhook:test', webhookUrl),
 }
 
 contextBridge.exposeInMainWorld('api', api)

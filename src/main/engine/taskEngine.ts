@@ -269,6 +269,7 @@ export class TaskEngine extends EventEmitter {
 
         // 企业微信通知（非阻塞）
         if (project.webhookEnabled && project.webhookUrl) {
+          const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
           const msg = buildTaskCompletedMarkdown({
             projectName: project.name,
             taskTitle: task.title,
@@ -277,6 +278,7 @@ export class TaskEngine extends EventEmitter {
             prompt: task.prompt,
             logsCount: logs.length,
             commitMessage: commitResult.success ? commitResult.message : undefined,
+            durationMs: totalSec * 1000,
           })
           void sendWecomMessage(project.webhookUrl, msg).then((res) => {
             if (!res.success) {

@@ -103,6 +103,8 @@ const httpApi: Api = {
   onEngineTaskFailed: (cb) => registerSseListener('engine:task:failed', cb),
 
   selectDirectory: () => Promise.resolve({ ok: false, error: '浏览器不支持系统目录选择' }),
+
+  testWebhook: (webhookUrl) => httpInvoke('POST', '/api/webhook/test', { webhookUrl }),
 }
 
 export const apiClient: Api = isElectron ? (window as any).api : httpApi
