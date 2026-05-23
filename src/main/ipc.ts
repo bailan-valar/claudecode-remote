@@ -7,6 +7,7 @@ import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState, saveEngineState } from './engineState'
 import { listRunners } from './engine/runnerRegistry'
 import { computeTimeTrackingChanges } from './utils/taskTimeTracking'
+import type { TimeEntry } from './utils/taskTimeTracking'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   // --- Sync handlers ---
@@ -181,6 +182,11 @@ export function registerIpcHandlers(win: BrowserWindow) {
     if (!db) return { ok: false, error: '未登录' }
     const repo = createTaskRepository(db)
     const now = new Date().toISOString()
+    const timeEntries: TimeEntry[] = []
+    let totalDuration = 0
+    if (doc.status === 'developing') {
+      timeEntries.push({ startedAt: now })
+    }
     const task = await repo.create({
       ...doc,
       type: 'task',
@@ -190,8 +196,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
       createdAt: now,
       updatedAt: now,
       createdVia: 'desktop',
-      timeEntries: [],
-      totalDuration: 0,
+      timeEntries,
+      totalDuration,
     })
     console.log('[ipc] task:create ok', task._id)
     return { ok: true, task }
