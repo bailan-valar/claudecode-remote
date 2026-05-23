@@ -199,16 +199,17 @@ function onDragEnd(e: DragEvent) {
 </template>
 
 <style scoped>
-/* List mode */
+/* List mode - 更紧凑的设计 */
 .task-list-item {
-  padding: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
   cursor: default;
   list-style: none;
   display: flex;
-  gap: var(--space-lg);
+  gap: var(--space-md);
   align-items: flex-start;
   transition: all var(--transition-fast);
   border-radius: var(--radius-md);
+  min-height: 80px;
 }
 
 .task-list-item:hover {
@@ -221,42 +222,42 @@ function onDragEnd(e: DragEvent) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .task-list-item .task-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   flex-wrap: wrap;
-  padding-top: var(--space-xs);
+  padding-top: 2px;
 }
 
 .task-list-item .task-badges {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 
 .task-list-item .task-meta {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 
 .task-list-item .title {
   font-weight: 600;
-  font-size: 1.125rem;
+  font-size: 1rem;
   color: var(--color-text);
   text-decoration: none;
   letter-spacing: -0.01em;
-  line-height: 1.3;
+  line-height: 1.4;
   transition: color var(--transition-fast);
   display: block;
-  margin-bottom: var(--space-xs);
+  margin-bottom: 2px;
 }
 
 .task-list-item .title:hover {
@@ -264,11 +265,11 @@ function onDragEnd(e: DragEvent) {
 }
 
 .task-list-item .kind-badge {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--color-text-secondary);
   background: rgba(0, 0, 0, 0.05);
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
   white-space: nowrap;
   border: 1px solid var(--glass-border-subtle);
@@ -282,9 +283,9 @@ function onDragEnd(e: DragEvent) {
 
 .task-list-item .priority-badge {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: var(--radius-full);
   white-space: nowrap;
   border: 1px solid transparent;
@@ -299,18 +300,18 @@ function onDragEnd(e: DragEvent) {
 
 .task-list-item .project {
   color: var(--color-text-secondary);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .task-list-item .project::before {
   content: '';
   display: inline-block;
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   background: currentColor;
   border-radius: 50%;
   opacity: 0.6;
@@ -318,15 +319,15 @@ function onDragEnd(e: DragEvent) {
 
 .task-list-item .duration {
   font-family: 'SF Mono', Monaco, monospace;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
   background: rgba(0, 0, 0, 0.04);
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: var(--radius-sm);
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   transition: all var(--transition-fast);
 }
 
@@ -349,28 +350,28 @@ function onDragEnd(e: DragEvent) {
 .task-list-item .actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   align-items: stretch;
   flex-shrink: 0;
-  min-width: 140px;
+  min-width: 120px;
 }
 
 .task-list-item .actions :deep(.actions) {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 
 .task-list-item .action-buttons {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 
 .task-list-item .actions .glass-button {
-  font-size: 0.8125rem;
-  padding: var(--space-sm) var(--space-md);
-  min-height: 32px;
+  font-size: 0.75rem;
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 28px;
   transition: all var(--transition-fast);
 }
 
@@ -650,19 +651,49 @@ function onDragEnd(e: DragEvent) {
 
 @media (max-width: 640px) {
   .task-list-item {
-    padding: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-sm);
+    min-height: auto;
+  }
+
+  .task-list-item .task-main {
+    gap: var(--space-xs);
+  }
+
+  .task-list-item .title {
+    font-size: 0.9375rem;
+    line-height: 1.3;
   }
 
   .task-list-item .task-header {
     justify-content: flex-start;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .task-list-item .task-badges {
+    gap: 4px;
   }
 
   .task-list-item .task-meta {
     width: 100%;
     justify-content: flex-start;
+    gap: 4px;
+  }
+
+  .task-list-item .kind-badge,
+  .task-list-item .priority-badge {
+    font-size: 0.625rem;
+    padding: 2px 6px;
+  }
+
+  .task-list-item .project {
+    font-size: 0.6875rem;
+  }
+
+  .task-list-item .duration {
+    font-size: 0.6875rem;
+    padding: 2px 5px;
   }
 
   .task-list-item .actions {
@@ -671,24 +702,27 @@ function onDragEnd(e: DragEvent) {
     justify-content: space-between;
     align-items: center;
     border-top: 1px solid var(--glass-border-subtle);
-    padding-top: var(--space-sm);
-    margin-top: var(--space-xs);
+    padding-top: var(--space-xs);
+    margin-top: 2px;
     min-width: auto;
+    gap: var(--space-xs);
   }
 
   .task-list-item .actions :deep(.actions) {
     flex: 1;
+    gap: var(--space-xs);
   }
 
   .task-list-item .action-buttons {
     flex: 1;
     justify-content: flex-end;
+    gap: var(--space-xs);
   }
 
   .task-list-item .actions .glass-button {
-    font-size: 0.875rem;
-    padding: var(--space-sm) var(--space-md);
-    min-height: 40px;
+    font-size: 0.8125rem;
+    padding: var(--space-xs) var(--space-sm);
+    min-height: 36px;
   }
 
   .task-kanban-item .card-actions .glass-button {
@@ -748,25 +782,6 @@ function onDragEnd(e: DragEvent) {
 
   .task-compact-item .compact-actions .btn-icon span {
     font-size: 0.5625rem;
-  }
-
-  .task-compact-item .compact-meta .project {
-    max-width: 50px;
-  }
-
-  .task-compact-item .compact-meta .kind {
-    padding: 1px 2px;
-    font-size: 0.55rem;
-  }
-
-  .task-compact-item .compact-meta .duration {
-    padding: 1px 2px;
-    font-size: 0.55rem;
-  }
-
-  .task-compact-item .compact-meta :deep(.badge) {
-    padding: 1px 2px;
-    font-size: 0.55rem;
   }
 }
 </style>

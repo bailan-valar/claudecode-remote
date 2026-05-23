@@ -201,7 +201,7 @@ header {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
 
 .header-actions {
@@ -228,6 +228,22 @@ header {
 @media (max-width: 640px) {
   .header-actions {
     gap: var(--space-sm);
+  }
+
+  .task-list {
+    gap: var(--space-xs);
+  }
+
+  .view-toggle .glass-button {
+    min-height: 32px;
+    font-size: 0.875rem;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .header-actions .glass-button.primary {
+    min-height: 32px;
+    font-size: 0.875rem;
+    padding: var(--space-xs) var(--space-md);
   }
 }
 </style>
