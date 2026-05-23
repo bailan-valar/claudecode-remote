@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted, nextTick } from 'vue'
+import { onMounted, ref, watch, onUnmounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
@@ -107,6 +107,13 @@ async function handleDeleteTask(taskId: string) {
   deletingTaskId.value = null
   await taskStore.remove(taskId)
 }
+
+// 为项目详情页添加排序后的任务列表
+const sortedTasks = computed(() => {
+  const list = taskStore.filteredTasks
+  // Sort by updatedAt in descending order (most recent first)
+  return [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+})
 
 // ── Claude Chat ──
 interface ChatMessage {
@@ -268,7 +275,7 @@ onUnmounted(() => {
           :class="{ active: activeTab === 'tasks' }"
           @click="activeTab = 'tasks'"
         >
-          任务列表（{{ taskStore.filteredTasks.length }}）
+          任务列表（{{ sortedTasks.length }}）
         </button>
         <button
           class="tab-button"
@@ -341,7 +348,7 @@ onUnmounted(() => {
         <div v-if="showCreateTask" class="form-panel glass">
           <TaskForm
             :projects="project ? [project] : []"
-            :tasks="taskStore.filteredTasks"
+            :tasks="sortedTasks"
             :default-project-id="projectId"
             mode="create"
             @submit="handleTaskCreated"
@@ -349,8 +356,8 @@ onUnmounted(() => {
           />
         </div>
 
-        <ul v-if="taskStore.filteredTasks.length" class="task-list">
-          <li v-for="t in taskStore.filteredTasks" :key="t._id" class="task-item glass glass-hover">
+        <ul v-if="sortedTasks.length" class="task-list">
+          <li v-for="t in sortedTasks" :key="t._id" class="task-item glass glass-hover">
             <div class="row">
               <StatusBadge :status="t.status" />
               <span class="kind-badge">{{ KIND_LABEL[t.kind] ?? t.kind ?? '任务' }}</span>
