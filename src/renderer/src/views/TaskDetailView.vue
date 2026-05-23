@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted } from 'vue'
+import { onMounted, ref, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -23,7 +23,16 @@ const task = ref<Task | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const liveDuration = ref(0)
+const logListRef = ref<HTMLElement | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
+
+function scrollLogsToBottom() {
+  nextTick(() => {
+    if (logListRef.value) {
+      logListRef.value.scrollTop = logListRef.value.scrollHeight
+    }
+  })
+}
 
 // 内联编辑状态
 const isEditingStatus = ref(false)
@@ -77,6 +86,16 @@ watch(
   (list) => {
     task.value = list.find((t) => t._id === taskId)
     startTimer()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => task.value?.logs.length,
+  () => {
+    if (task.value?.logs.length) {
+      scrollLogsToBottom()
+    }
   },
   { immediate: true },
 )
@@ -195,7 +214,7 @@ async function handleDelete() {
 
     <section v-if="task.logs.length" class="logs">
       <h2 class="section-title">执行日志</h2>
-      <div class="log-list glass">
+      <div ref="logListRef" class="log-list glass">
         <div
           v-for="(log, idx) in task.logs"
           :key="idx"
