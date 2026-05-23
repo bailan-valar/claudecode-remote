@@ -179,7 +179,7 @@ export class TaskEngine extends EventEmitter {
     }
 
     const taskRepo = createTaskRepository(this.db)
-    const task = await taskRepo.findById(taskId)
+    let task = await taskRepo.findById(taskId)
     if (!task) {
       return { ok: false, error: '任务不存在' }
     }

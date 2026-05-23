@@ -366,3 +366,79 @@ export function abortClaudeChatAction(chatId?: string) {
   }
   return { ok: true }
 }
+
+// === Terminal ===
+
+import { spawn } from 'child_process'
+import { promisify } from 'util'
+
+export async function executeTerminalCommandAction(projectId: string, command: string, workingDir?: string) {
+  console.log('[api] terminal:execute', projectId, command.slice(0, 60))
+
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+
+  const repo = createProjectRepository(db)
+  const project = await repo.findById(projectId)
+  if (!project) return { ok: false, error: '项目不存在' }
+
+  const cwd = workingDir || project.path
+  if (!cwd) return { ok: false, error: '项目路径未配置' }
+
+  return new Promise((resolve) => {
+    const startTime = Date.now()
+    let stdout = ''
+    let stderr = ''
+    let combinedOutput = ''
+
+    // 解析命令和参数
+    const parts = command.trim().split(/\s+/)
+    const cmd = parts[0]
+    const args = parts.slice(1)
+
+    const child = spawn(cmd, args, {
+      cwd,
+      shell: true,
+      env: { ...process.env },
+    })
+
+    child.stdout?.on('data', (data) => {
+      const text = data.toString()
+      stdout += text
+      combinedOutput += text
+    })
+
+    child.stderr?.on('data', (data) => {
+      const text = data.toString()
+      stderr += text
+      combinedOutput += text
+    })
+
+    child.on('close', (code) => {
+      const duration = Date.now() - startTime
+      console.log('[api] terminal:execute done', { exitCode: code, duration })
+
+      resolve({
+        ok: true,
+        exitCode: code || 0,
+        stdout,
+        stderr,
+        combinedOutput,
+        duration,
+      })
+    })
+
+    child.on('error', (error) => {
+      console.error('[api] terminal:execute error:', error.message)
+      resolve({
+        ok: false,
+        error: error.message,
+        exitCode: -1,
+        stdout,
+        stderr,
+        combinedOutput: stderr + error.message,
+        duration: Date.now() - startTime,
+      })
+    })
+  })
+}

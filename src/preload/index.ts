@@ -87,6 +87,10 @@ const api = {
   // === Dialog ===
   selectDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
 
+  // === Terminal ===
+  executeTerminalCommand: (projectId: string, command: string, workingDir?: string) =>
+    ipcRenderer.invoke('terminal:execute', projectId, command, workingDir),
+
   // === Webhook ===
   testWebhook: (webhookUrl: string) => ipcRenderer.invoke('webhook:test', webhookUrl),
 }

@@ -283,6 +283,13 @@ export function startWebServer(): void {
           return
         }
 
+        // Terminal
+        if (pathname === '/api/terminal/execute' && req.method === 'POST') {
+          const result = await api.executeTerminalCommandAction(body.projectId, body.command, body.workingDir)
+          sendJson(res, 200, result)
+          return
+        }
+
         // Sync
         if (pathname === '/api/sync/refresh' && req.method === 'POST') {
           // imported dynamically to avoid circular dep at module level if needed

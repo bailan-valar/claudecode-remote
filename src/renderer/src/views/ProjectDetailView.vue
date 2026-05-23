@@ -28,7 +28,7 @@ const project = ref<Project | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const showCreateTask = ref(false)
-const activeTab = ref<'info' | 'tasks' | 'chat'>('info')
+const activeTab = ref<'info' | 'tasks' | 'chat' | 'terminal'>('info')
 const tick = ref(0)
 let timerId: ReturnType<typeof setInterval> | null = null
 
@@ -226,6 +226,77 @@ function clearChat() {
   chatSessionId.value = undefined
 }
 
+// ── Terminal ──
+interface TerminalCommand {
+  id: string
+  command: string
+  output: string
+  error: string
+  exitCode: number
+  duration: number
+  timestamp: string
+}
+
+const terminalCommands = ref<TerminalCommand[]>([])
+const terminalInput = ref('')
+const terminalLoading = ref(false)
+const terminalContainerRef = ref<HTMLElement | null>(null)
+
+function scrollTerminalToBottom() {
+  nextTick(() => {
+    if (terminalContainerRef.value) {
+      terminalContainerRef.value.scrollTop = terminalContainerRef.value.scrollHeight
+    }
+  })
+}
+
+async function handleExecuteCommand() {
+  const command = terminalInput.value.trim()
+  if (!command || terminalLoading.value || !project.value) return
+
+  const cmdId = Date.now().toString()
+  terminalCommands.value.push({
+    id: cmdId,
+    command,
+    output: '',
+    error: '',
+    exitCode: 0,
+    duration: 0,
+    timestamp: new Date().toISOString(),
+  })
+  terminalInput.value = ''
+  scrollTerminalToBottom()
+
+  terminalLoading.value = true
+
+  try {
+    const result = await apiClient.executeTerminalCommand(project.value._id, command)
+    const lastCmd = terminalCommands.value[terminalCommands.value.length - 1]
+    if (lastCmd && lastCmd.id === cmdId) {
+      lastCmd.output = result.stdout || ''
+      lastCmd.error = result.stderr || ''
+      lastCmd.exitCode = result.exitCode ?? 0
+      lastCmd.duration = result.duration ?? 0
+      if (!result.ok && result.error) {
+        lastCmd.error += result.error
+      }
+    }
+  } catch (err: any) {
+    const lastCmd = terminalCommands.value[terminalCommands.value.length - 1]
+    if (lastCmd && lastCmd.id === cmdId) {
+      lastCmd.error = err.message || '执行命令失败'
+      lastCmd.exitCode = -1
+    }
+  } finally {
+    terminalLoading.value = false
+    scrollTerminalToBottom()
+  }
+}
+
+function clearTerminal() {
+  terminalCommands.value = []
+}
+
 onMounted(() => {
   project.value = projectStore.projects.find((p) => p._id === projectId)
   if (!project.value) projectStore.fetch()
@@ -287,6 +358,13 @@ onUnmounted(() => {
           @click="activeTab = 'chat'"
         >
           Claude 对话
+        </button>
+        <button
+          class="tab-button"
+          :class="{ active: activeTab === 'terminal' }"
+          @click="activeTab = 'terminal'"
+        >
+          终端
         </button>
       </div>
 
@@ -447,6 +525,56 @@ onUnmounted(() => {
             @click="handleSendChat"
           >
             {{ chatLoading ? '发送中…' : '发送' }}
+          </button>
+        </div>
+      </section>
+
+      <!-- 终端 -->
+      <section v-show="activeTab === 'terminal'" class="terminal">
+        <div class="terminal-toolbar">
+          <button class="glass-button" @click="clearTerminal">清空终端</button>
+          <span v-if="project" class="terminal-path">{{ project.path }}</span>
+        </div>
+        <div ref="terminalContainerRef" class="terminal-container glass">
+          <div v-if="!terminalCommands.length" class="terminal-empty">
+            <p>在项目目录中执行终端命令。</p>
+            <p class="terminal-hint">提示: 支持 npm, git, node 等常用命令</p>
+          </div>
+          <div
+            v-for="cmd in terminalCommands"
+            :key="cmd.id"
+            class="terminal-command"
+          >
+            <div class="command-line">
+              <span class="prompt">$</span>
+              <span class="command">{{ cmd.command }}</span>
+              <span v-if="cmd.duration > 0" class="command-duration">{{ cmd.duration }}ms</span>
+            </div>
+            <div v-if="cmd.output || cmd.error" class="command-output">
+              <pre v-if="cmd.output" class="output-stdout">{{ cmd.output }}</pre>
+              <pre v-if="cmd.error" class="output-stderr">{{ cmd.error }}</pre>
+            </div>
+            <div v-if="cmd.exitCode !== 0 && !cmd.error" class="command-status">
+              退出码: {{ cmd.exitCode }}
+            </div>
+          </div>
+        </div>
+        <div class="terminal-input-panel glass">
+          <span class="terminal-prompt">$</span>
+          <input
+            v-model="terminalInput"
+            class="terminal-input"
+            type="text"
+            placeholder="输入命令，按 Enter 执行…"
+            @keydown.enter.prevent="handleExecuteCommand"
+            :disabled="terminalLoading"
+          />
+          <button
+            class="glass-button primary"
+            :disabled="terminalLoading || !terminalInput.trim()"
+            @click="handleExecuteCommand"
+          >
+            {{ terminalLoading ? '执行中…' : '执行' }}
           </button>
         </div>
       </section>
@@ -864,6 +992,150 @@ header .actions {
   padding: var(--space-sm) var(--space-lg);
 }
 
+/* ── Terminal ── */
+.terminal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.terminal-path {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.terminal-container {
+  max-height: 480px;
+  min-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.terminal-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--space-2xl);
+  font-size: 0.9375rem;
+}
+
+.terminal-hint {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-sm);
+}
+
+.terminal-command {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.command-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.9375rem;
+}
+
+.prompt {
+  color: #4ec9b0;
+  font-weight: 600;
+}
+
+.command {
+  color: #dcdcaa;
+  flex: 1;
+  word-break: break-all;
+}
+
+.command-duration {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.command-output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-left: var(--space-lg);
+}
+
+.output-stdout,
+.output-stderr {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.output-stdout {
+  color: #d4d4d4;
+}
+
+.output-stderr {
+  color: #f48771;
+}
+
+.command-status {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  padding-left: var(--space-lg);
+}
+
+.terminal-input-panel {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  align-items: center;
+  background: #2d2d2d;
+  border: 1px solid #3e3e3e;
+}
+
+.terminal-prompt {
+  color: #4ec9b0;
+  font-weight: 600;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 1rem;
+}
+
+.terminal-input {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  border-radius: var(--radius-md);
+  border: 1px solid #3e3e3e;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'SF Mono', Monaco, monospace;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.terminal-input:focus {
+  border-color: #4ec9b0;
+}
+
+.terminal-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.terminal-input-panel .glass-button {
+  min-height: 40px;
+  padding: var(--space-sm) var(--space-lg);
+}
+
 @media (max-width: 640px) {
   .task-item {
     padding: var(--space-md);
@@ -893,6 +1165,21 @@ header .actions {
   .chat-input-panel .glass-button {
     width: 100%;
     min-height: 44px;
+  }
+
+  .terminal-input-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .terminal-input-panel .glass-button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .terminal-container {
+    max-height: 360px;
+    min-height: 180px;
   }
 }
 </style>

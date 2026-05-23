@@ -134,4 +134,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
     console.log('[ipc] dialog:openDirectory ok', result.filePaths[0])
     return { ok: true, path: result.filePaths[0] }
   })
+
+  // --- Terminal handlers ---
+  ipcMain.removeHandler('terminal:execute')
+  ipcMain.handle('terminal:execute', async (_, projectId: string, command: string, workingDir?: string) => {
+    return api.executeTerminalCommandAction(projectId, command, workingDir)
+  })
 }

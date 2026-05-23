@@ -112,6 +112,9 @@ const httpApi: Api = {
   abortClaudeChat: () => Promise.resolve({ ok: false, error: 'Web 端暂不支持中断' }),
   onClaudeChatLog: (cb) => registerSseListener('claude:chat:log', cb),
   onClaudeChatDone: (cb) => registerSseListener('claude:chat:done', cb),
+
+  executeTerminalCommand: (projectId, command, workingDir?) =>
+    httpInvoke('POST', '/api/terminal/execute', { projectId, command, workingDir }),
 }
 
 export const apiClient: Api = isElectron ? (window as any).api : httpApi

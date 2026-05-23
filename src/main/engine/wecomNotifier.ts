@@ -68,8 +68,14 @@ export function buildTaskCompletedMarkdown(opts: {
 }): WecomMessage {
   const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
   const pendingStr = opts.pendingCount != null ? `**待开发任务**: ${opts.pendingCount} 个` : ''
+
+  // 处理任务标题显示：超过8个字则截断为「XXXXXXXX…」
+  const displayTitle = opts.taskTitle.length > 8
+    ? `「${opts.taskTitle.slice(0, 8)}…」`
+    : opts.taskTitle
+
   const content = [
-    `## ✅ 任务开发完成`,
+    `## ✅ ${displayTitle}开发完成`,
     ``,
     `**项目**: ${opts.projectName}`,
     `**任务**: ${opts.taskTitle}`,
