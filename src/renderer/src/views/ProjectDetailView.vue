@@ -1239,8 +1239,12 @@ header .actions {
     min-height: 40px;
   }
 
-  .chat-bubble {
-    max-width: 92%;
+  .chat-message.user .chat-bubble {
+    max-width: 95%;
+  }
+
+  .chat-message.assistant .chat-bubble {
+    max-width: 90%;
   }
 
   .chat-input-panel {
