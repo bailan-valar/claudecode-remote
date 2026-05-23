@@ -40,7 +40,7 @@ const props = withDefaults(defineProps<Props>(), {
 }
 
 .badge-small {
-  font-size: 0.625rem;
-  padding: 1px 4px;
+  font-size: 0.5375rem;
+  padding: 1px 2px;
 }
 </style>

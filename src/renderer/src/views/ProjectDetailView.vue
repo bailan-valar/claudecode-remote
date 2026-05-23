@@ -819,7 +819,7 @@ header .actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   flex-wrap: wrap;
   gap: var(--space-sm);
 }
@@ -836,7 +836,7 @@ header .actions {
 /* 手机端更紧凑的间隔 */
 @media (max-width: 640px) {
   .tasks-header {
-    margin-bottom: 2px;
+    margin-bottom: 1px;
   }
 
   .task-list {
@@ -845,22 +845,38 @@ header .actions {
 
   /* 为TaskListItem添加紧凑模式类 */
   .task-list :deep(.task-compact-item) {
-    padding: 3px 4px;
-    min-height: 26px;
+    padding: 2px 3px;
+    min-height: 20px;
+    border-radius: 0;
+  }
+
+  .task-list :deep(.task-compact-item:first-child) {
+    border-top-left-radius: var(--radius-sm);
+    border-top-right-radius: var(--radius-sm);
+  }
+
+  .task-list :deep(.task-compact-item:last-child) {
+    border-bottom: none;
+    border-bottom-left-radius: var(--radius-sm);
+    border-bottom-right-radius: var(--radius-sm);
+  }
+
+  .task-list :deep(.task-compact-item:hover) {
+    background: rgba(0, 0, 0, 0.025);
   }
 
   .task-list :deep(.task-compact-item .compact-title) {
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
   }
 
   .task-list :deep(.task-compact-item .compact-meta) {
-    font-size: 0.5625rem;
+    font-size: 0.5rem;
   }
 
   .task-list :deep(.task-compact-item .compact-actions .btn-icon) {
-    min-height: 18px;
-    min-width: 18px;
-    max-width: 18px;
+    min-height: 16px;
+    min-width: 16px;
+    max-width: 16px;
   }
 }
 
