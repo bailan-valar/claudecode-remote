@@ -499,21 +499,32 @@ function onDragEnd(e: DragEvent) {
 
 /* Compact mode - 重新设计为超紧凑布局 */
 .task-compact-item {
-  padding: 1px 3px;
+  padding: 2px 4px;
   list-style: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1px;
-  transition: background-color var(--transition-fast);
+  gap: 2px;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
   border-radius: 0;
-  min-height: 20px;
+  min-height: 24px;
   border-bottom: 1px solid var(--glass-border-subtle);
   background-color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .task-compact-item:hover {
   background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* 移动端触摸反馈 */
+@media (hover: none) and (pointer: coarse) {
+  .task-compact-item:active {
+    background-color: rgba(0, 122, 255, 0.1);
+    transform: scale(0.99);
+  }
 }
 
 .task-compact-item .compact-main {
@@ -621,22 +632,34 @@ function onDragEnd(e: DragEvent) {
 
 .task-compact-item .compact-actions .btn-icon {
   font-size: 0.75rem;
-  padding: 1px;
-  min-height: 16px;
-  min-width: 16px;
-  max-width: 16px;
+  padding: 2px;
+  min-height: 18px;
+  min-width: 18px;
+  max-width: 18px;
   transition: all var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .task-compact-item .compact-actions .btn-icon:hover {
   transform: scale(1.15);
   background: rgba(0, 0, 0, 0.03);
   border-color: var(--glass-border-subtle);
+}
+
+/* 移动端按钮触摸反馈 */
+@media (hover: none) and (pointer: coarse) {
+  .task-compact-item .compact-actions .btn-icon:active {
+    transform: scale(0.9);
+    background: rgba(0, 122, 255, 0.15);
+  }
 }
 
 .task-compact-item .compact-actions .btn-icon span {
@@ -733,9 +756,9 @@ function onDragEnd(e: DragEvent) {
 
   /* 优化移动端的紧凑模式 */
   .task-compact-item {
-    padding: 2px 3px;
-    min-height: 20px;
-    gap: 2px;
+    padding: 3px 4px;
+    min-height: 26px;
+    gap: 3px;
   }
 
   .task-compact-item .compact-main {
@@ -774,10 +797,10 @@ function onDragEnd(e: DragEvent) {
   }
 
   .task-compact-item .compact-actions .btn-icon {
-    min-height: 16px;
-    min-width: 16px;
-    max-width: 16px;
-    padding: 1px;
+    min-height: 20px;
+    min-width: 20px;
+    max-width: 20px;
+    padding: 2px;
   }
 
   .task-compact-item .compact-actions .btn-icon span {

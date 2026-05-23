@@ -269,3 +269,68 @@ select.glass-input {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
+
+/* ── 移动端触摸优化 ── */
+@media (hover: none) and (pointer: coarse) {
+  /* 提高触摸目标的最小尺寸 */
+  .glass-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: var(--space-sm) var(--space-lg);
+  }
+
+  /* 移除悬停效果，优化触摸反馈 */
+  .glass-button:active {
+    transform: scale(0.97);
+    background: var(--glass-bg-hover);
+  }
+
+  .glass-button.primary:active {
+    background: var(--color-accent-hover);
+  }
+
+  /* 优化输入框的触摸体验 */
+  .glass-input {
+    font-size: 16px; /* 防止iOS自动缩放 */
+    min-height: 44px;
+  }
+
+  /* 优化链接的触摸体验 */
+  a {
+    -webkit-tap-highlight-color: rgba(0, 113, 227, 0.2);
+    touch-action: manipulation;
+  }
+
+  /* 优化滚动体验 */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ── 小屏幕设备优化 ── */
+@media (max-width: 640px) {
+  body {
+    font-size: 16px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-md);
+  }
+
+  /* 优化玻璃效果在移动端的表现 */
+  .glass {
+    backdrop-filter: blur(12px) saturate(1.5);
+    -webkit-backdrop-filter: blur(12px) saturate(1.5);
+  }
+
+  .glass-button {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .glass-input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+}

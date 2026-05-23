@@ -23,6 +23,7 @@ const selectedProjectId = ref<string | null>(null)
 const selectedStatus = ref<TaskStatus | null>(null)
 const deletingTaskId = ref<string | null>(null)
 const viewMode = ref<'list' | 'kanban'>('list')
+const listDensity = ref<'comfortable' | 'compact'>('comfortable')
 
 function setViewMode(mode: 'list' | 'kanban') {
   viewMode.value = mode
@@ -104,6 +105,24 @@ onUnmounted(() => {
             看板
           </button>
         </div>
+        <div v-if="viewMode === 'list'" class="density-toggle">
+          <button
+            class="glass-button"
+            :class="{ active: listDensity === 'comfortable' }"
+            @click="listDensity = 'comfortable'"
+            title="舒适模式"
+          >
+            舒适
+          </button>
+          <button
+            class="glass-button"
+            :class="{ active: listDensity === 'compact' }"
+            @click="listDensity = 'compact'"
+            title="紧凑模式"
+          >
+            紧凑
+          </button>
+        </div>
         <button class="glass-button primary" @click="showForm = true">+ 新建任务</button>
       </div>
     </header>
@@ -147,6 +166,7 @@ onUnmounted(() => {
           :task="t"
           :project-name="projectNameMap.get(t.projectId) ?? t.projectId"
           :tick="tick"
+          :mode="listDensity === 'compact' ? 'compact' : 'list'"
           @transition="taskStore.updateStatus(t._id, $event)"
           @edit="router.push({ name: 'task-detail', params: { id: $event } })"
           @delete="deletingTaskId = $event"
@@ -225,9 +245,27 @@ header {
   border-color: transparent;
 }
 
+.density-toggle {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.density-toggle .glass-button {
+  min-height: 36px;
+  font-size: 0.875rem;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.density-toggle .glass-button.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: transparent;
+}
+
 @media (max-width: 640px) {
   .header-actions {
     gap: var(--space-sm);
+    flex-wrap: wrap;
   }
 
   .task-list {
@@ -235,6 +273,12 @@ header {
   }
 
   .view-toggle .glass-button {
+    min-height: 32px;
+    font-size: 0.875rem;
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .density-toggle .glass-button {
     min-height: 32px;
     font-size: 0.875rem;
     padding: var(--space-xs) var(--space-sm);
