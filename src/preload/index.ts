@@ -10,10 +10,10 @@ export type SyncStatus =
 
 const api = {
   // === Phase 1 已有 ===
-  onSyncStatus: (cb: (status: SyncStatus) => void) => {
+  onSyncStatus: (cb: (status: SyncStatus) => void): (() => void) => {
     const listener = (_: unknown, status: SyncStatus) => cb(status)
     ipcRenderer.on('sync:status', listener)
-    return () => ipcRenderer.off('sync:status', listener)
+    return () => { ipcRenderer.off('sync:status', listener) }
   },
   refreshSync: () => ipcRenderer.invoke('sync:refresh'),
 
@@ -51,20 +51,20 @@ const api = {
   listEngineProviders: () => ipcRenderer.invoke('engine:listProviders'),
   getEngineProvider: () => ipcRenderer.invoke('engine:getProvider'),
   setEngineProvider: (name: string) => ipcRenderer.invoke('engine:setProvider', name),
-  onEngineStatus: (cb: (status: any) => void) => {
+  onEngineStatus: (cb: (status: any) => void): (() => void) => {
     const listener = (_: unknown, status: any) => cb(status)
     ipcRenderer.on('engine:status', listener)
-    return () => ipcRenderer.off('engine:status', listener)
+    return () => { ipcRenderer.off('engine:status', listener) }
   },
-  onEngineTaskCompleted: (cb: (taskId: string, result: any) => void) => {
+  onEngineTaskCompleted: (cb: (taskId: string, result: any) => void): (() => void) => {
     const listener = (_: unknown, taskId: string, result: any) => cb(taskId, result)
     ipcRenderer.on('engine:task:completed', listener)
-    return () => ipcRenderer.off('engine:task:completed', listener)
+    return () => { ipcRenderer.off('engine:task:completed', listener) }
   },
-  onEngineTaskFailed: (cb: (taskId: string, error: string) => void) => {
+  onEngineTaskFailed: (cb: (taskId: string, error: string) => void): (() => void) => {
     const listener = (_: unknown, taskId: string, error: string) => cb(taskId, error)
     ipcRenderer.on('engine:task:failed', listener)
-    return () => ipcRenderer.off('engine:task:failed', listener)
+    return () => { ipcRenderer.off('engine:task:failed', listener) }
   },
 
   // === Dialog ===

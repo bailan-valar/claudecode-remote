@@ -27,28 +27,31 @@ export async function autoCommit(
     // 获取当前状态
     const status = await git.status()
 
-    // 如果没有变更，跳过提交
-    if (
-      status.modified.length === 0 &&
-      status.created.length === 0 &&
-      status.deleted.length === 0 &&
-      status.renamed.length === 0
-    ) {
-      return { success: true, message: '没有文件变更，跳过提交' }
+    const hasChanges =
+      status.modified.length > 0 ||
+      status.created.length > 0 ||
+      status.deleted.length > 0 ||
+      status.renamed.length > 0
+
+    const commitMsg = `auto: complete task "${taskTitle}"`
+
+    // 如果有变更，先添加到暂存区
+    if (hasChanges) {
+      await git.add('.')
     }
 
-    // 添加所有变更
-    await git.add('.')
-
-    // 提交，使用任务标题作为提交信息
-    const commitMsg = `auto: complete task "${taskTitle}"`
-    const commitResult = await git.commit(commitMsg)
+    // 提交；若工作区干净则创建空提交
+    const commitResult = hasChanges
+      ? await git.commit(commitMsg)
+      : await git.commit(commitMsg, undefined, { '--allow-empty': null })
 
     if (commitResult.commit) {
       return {
         success: true,
         commitHash: commitResult.commit,
-        message: `已提交: ${commitMsg} (${commitResult.commit})`,
+        message: hasChanges
+          ? `已提交: ${commitMsg} (${commitResult.commit})`
+          : `工作区干净，已创建空提交: ${commitMsg} (${commitResult.commit})`,
       }
     }
 
