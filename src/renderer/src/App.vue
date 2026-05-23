@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useAuthStore } from './stores/useAuthStore'
+import { useRoute } from 'vue-router'
+import { getGlobalKeepAliveManager } from './utils/keepAliveManager'
 
 const auth = useAuthStore()
+const route = useRoute()
 const isMobile = ref(false)
+
+// 初始化 keep-alive 管理器
+const keepAliveManager = getGlobalKeepAliveManager()
 
 function checkMobile() {
   isMobile.value = window.innerWidth < 768
@@ -13,10 +19,25 @@ onMounted(() => {
   auth.checkSession()
   checkMobile()
   window.addEventListener('resize', checkMobile)
+
+  // 启动自动缓存管理
+  keepAliveManager.autoManageCache()
 })
+
+// 监听路由变化，动态更新缓存
+watch(() => route.meta, (meta) => {
+  const cacheName = meta.cacheName as string || route.name as string
+  if (meta.keepAlive === false) {
+    keepAliveManager.addToExclude(cacheName)
+  }
+}, { immediate: true })
 
 const showMobileNav = computed(() => auth.currentUser && isMobile.value)
 const showSidebar = computed(() => auth.currentUser && !isMobile.value)
+
+// 计算需要缓存的组件
+const include = computed(() => keepAliveManager.cacheComponents.value.join(','))
+const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','))
 </script>
 
 <template>
@@ -49,10 +70,12 @@ const showSidebar = computed(() => auth.currentUser && !isMobile.value)
       </aside>
       <main class="main">
         <RouterView v-slot="{ Component }">
-          <keep-alive>
-            <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive !== false" />
-          </keep-alive>
-          <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive === false" />
+          <template v-if="Component">
+            <keep-alive :include="include" :exclude="exclude">
+              <component :is="Component" :key="$route.fullPath" v-if="$route.meta.keepAlive !== false" />
+            </keep-alive>
+            <component :is="Component" :key="$route.fullPath" v-if="$route.meta.keepAlive === false" />
+          </template>
         </RouterView>
       </main>
       <nav v-if="showMobileNav" class="mobile-nav glass">
@@ -76,10 +99,12 @@ const showSidebar = computed(() => auth.currentUser && !isMobile.value)
     </template>
     <template v-else>
       <RouterView v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive !== false" />
-        </keep-alive>
-        <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive === false" />
+        <template v-if="Component">
+          <keep-alive :include="include" :exclude="exclude">
+            <component :is="Component" :key="$route.fullPath" v-if="$route.meta.keepAlive !== false" />
+          </keep-alive>
+          <component :is="Component" :key="$route.fullPath" v-if="$route.meta.keepAlive === false" />
+        </template>
       </RouterView>
     </template>
   </div>

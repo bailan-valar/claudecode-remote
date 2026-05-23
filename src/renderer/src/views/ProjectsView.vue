@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineOptions } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import ProjectForm from '../components/ProjectForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import type { Project } from '../../../shared/types'
+
+defineOptions({
+  name: 'ProjectsView'
+})
 
 const router = useRouter()
 const projectStore = useProjectStore()

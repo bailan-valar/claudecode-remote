@@ -12,11 +12,11 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/login', name: 'login', component: LoginView, meta: { public: true, keepAlive: false } },
-    { path: '/', name: 'home', component: HomeView, meta: { keepAlive: true } },
-    { path: '/projects', name: 'projects', component: ProjectsView, meta: { keepAlive: true } },
-    { path: '/projects/:id', name: 'project-detail', component: ProjectDetailView, meta: { keepAlive: true } },
-    { path: '/tasks', name: 'tasks', component: TasksView, meta: { keepAlive: true } },
-    { path: '/tasks/:id', name: 'task-detail', component: TaskDetailView, meta: { keepAlive: true } },
+    { path: '/', name: 'home', component: HomeView, meta: { keepAlive: true, cacheName: 'home' } },
+    { path: '/projects', name: 'projects', component: ProjectsView, meta: { keepAlive: true, cacheName: 'projects' } },
+    { path: '/projects/:id', name: 'project-detail', component: ProjectDetailView, meta: { keepAlive: true, cacheName: 'project-detail' } },
+    { path: '/tasks', name: 'tasks', component: TasksView, meta: { keepAlive: true, cacheName: 'tasks' } },
+    { path: '/tasks/:id', name: 'task-detail', component: TaskDetailView, meta: { keepAlive: true, cacheName: 'task-detail' } },
   ],
 })
 

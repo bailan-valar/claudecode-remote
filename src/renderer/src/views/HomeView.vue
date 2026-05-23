@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, defineOptions } from 'vue'
 import { useSyncStore } from '../stores/useSyncStore'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useEngineStore } from '../stores/useEngineStore'
 import { storeToRefs } from 'pinia'
+
+defineOptions({
+  name: 'HomeView'
+})
 
 const store = useSyncStore()
 const { status } = storeToRefs(store)

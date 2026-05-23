@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, defineOptions } from 'vue'
 import { useAuthStore } from '../stores/useAuthStore'
+
+defineOptions({
+  name: 'LoginView'
+})
 
 const auth = useAuthStore()
 const isRegister = ref(false)

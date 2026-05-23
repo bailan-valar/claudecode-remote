@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted, computed } from 'vue'
+import { onMounted, ref, watch, onUnmounted, computed, defineOptions } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -15,6 +15,10 @@ import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
 import { TASK_STATUS, KIND_LABEL } from '../../../shared/constants'
 import { STATUS_LABEL } from '../utils/taskTransitions'
 import type { Task, StatusHistoryEntry } from '../../../shared/types'
+
+defineOptions({
+  name: 'TaskDetailView'
+})
 
 const route = useRoute()
 const router = useRouter()

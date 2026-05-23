@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted, nextTick, computed } from 'vue'
+import { onMounted, ref, watch, onUnmounted, nextTick, computed, defineOptions } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
@@ -13,6 +13,10 @@ import { KIND_LABEL } from '../../../shared/constants'
 import { apiClient } from '../api/index'
 import type { Project, Task } from '../../../shared/types'
 import type { LogEntry } from '../../../main/engine/runner'
+
+defineOptions({
+  name: 'ProjectDetailView'
+})
 
 const route = useRoute()
 const router = useRouter()

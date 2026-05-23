@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, onUnmounted } from 'vue'
+import { onMounted, ref, computed, onUnmounted, defineOptions } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -10,6 +10,10 @@ import TaskListItem from '../components/TaskListItem.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import type { TaskStatus } from '../../../shared/constants'
+
+defineOptions({
+  name: 'TasksView'
+})
 
 const router = useRouter()
 const taskStore = useTaskStore()

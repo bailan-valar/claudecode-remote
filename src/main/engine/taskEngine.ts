@@ -480,34 +480,6 @@ export class TaskEngine extends EventEmitter {
 
           this.emit('task:failed', task._id, result.error)
         }
-      })
-
-        // 失败通知（默认开启，可通过 webhookNotifyOnFailure=false 关闭）
-        if (
-          project.webhookEnabled &&
-          project.webhookUrl &&
-          project.webhookNotifyOnFailure !== false
-        ) {
-          const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
-          const pendingCount = await getProjectPendingCount(taskRepo, task.projectId)
-          const failMsg = buildTaskFailedMarkdown({
-            projectName: project.name,
-            taskTitle: task.title,
-            taskId: task._id,
-            prompt: task.prompt ?? '',
-            error: result.error ?? '执行失败',
-            durationMs: totalSec * 1000,
-            taskUrl: buildTaskUrl(project, task._id),
-            pendingCount,
-          })
-          void sendWecomMessage(project.webhookUrl, failMsg).then((res) => {
-            if (!res.success) {
-              console.error('[wecom] 失败通知发送失败:', res.error)
-            }
-          })
-        }
-
-        this.emit('task:failed', task._id, result.error)
       }
     } catch (err: any) {
       const currentTask = await taskRepo.findById(task._id) ?? latestTask
