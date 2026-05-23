@@ -5,8 +5,20 @@
 
 export interface WecomMessage {
   msgtype: 'text' | 'markdown'
-  text?: { content: string; mentioned_list?: string[] }
+  text?: { content: string; mentioned_list?: string[]; mentioned_mobile_list?: string[] }
   markdown?: { content: string }
+}
+
+export const WECOM_WEBHOOK_HOST = 'qyapi.weixin.qq.com'
+
+export function isValidWecomWebhookUrl(url: string): boolean {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    return u.hostname === WECOM_WEBHOOK_HOST && u.pathname.includes('/cgi-bin/webhook/send')
+  } catch {
+    return false
+  }
 }
 
 export async function sendWecomMessage(
@@ -15,6 +27,9 @@ export async function sendWecomMessage(
 ): Promise<{ success: boolean; error?: string }> {
   if (!webhookUrl) {
     return { success: false, error: 'webhook URL 为空' }
+  }
+  if (!isValidWecomWebhookUrl(webhookUrl)) {
+    return { success: false, error: '不是合法的企业微信机器人 URL (应为 qyapi.weixin.qq.com)' }
   }
 
   try {
@@ -70,6 +85,48 @@ export function buildTaskCompletedMarkdown(opts: {
   return {
     msgtype: 'markdown',
     markdown: { content },
+  }
+}
+
+export function buildTaskFailedMarkdown(opts: {
+  projectName: string
+  taskTitle: string
+  taskId: string
+  prompt: string
+  error: string
+  durationMs?: number
+}): WecomMessage {
+  const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
+  const content = [
+    `## ❌ 任务执行失败`,
+    ``,
+    `**项目**: ${opts.projectName}`,
+    `**任务**: ${opts.taskTitle}`,
+    durationStr ? `**耗时**: ${durationStr}` : '',
+    ``,
+    `**错误**:`,
+    `> <font color="warning">${opts.error.slice(0, 500)}</font>`,
+    ``,
+    `---`,
+    `**Prompt 摘要**:`,
+    `> ${opts.prompt.slice(0, 200)}${opts.prompt.length > 200 ? '...' : ''}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return {
+    msgtype: 'markdown',
+    markdown: { content },
+  }
+}
+
+export function buildMentionTextMessage(mentionedList: string[], content: string): WecomMessage {
+  return {
+    msgtype: 'text',
+    text: {
+      content,
+      mentioned_list: mentionedList,
+    },
   }
 }
 

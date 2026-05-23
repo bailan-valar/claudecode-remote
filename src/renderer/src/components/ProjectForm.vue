@@ -38,6 +38,8 @@ const llmModel = ref('')
 const allowedTools = ref('Read,Edit,Bash')
 const webhookUrl = ref('')
 const webhookEnabled = ref(false)
+const webhookNotifyOnFailure = ref(true)
+const webhookMentionedList = ref('')
 const webhookTesting = ref(false)
 const webhookTestMessage = ref<{ ok: boolean; text: string } | null>(null)
 
@@ -55,6 +57,8 @@ watch(() => props.initialProject, (p) => {
     allowedTools.value = p.allowedTools?.join(',') ?? 'Read,Edit,Bash'
     webhookUrl.value = p.webhookUrl ?? ''
     webhookEnabled.value = p.webhookEnabled ?? false
+    webhookNotifyOnFailure.value = p.webhookNotifyOnFailure ?? true
+    webhookMentionedList.value = p.webhookMentionedList?.join(',') ?? ''
   }
 }, { immediate: true })
 
@@ -109,6 +113,7 @@ function buildLlmConfig() {
 
 async function handleSubmit() {
   const tools = allowedTools.value.split(',').map(s => s.trim()).filter(Boolean)
+  const mentioned = webhookMentionedList.value.split(',').map(s => s.trim()).filter(Boolean)
   if (isEdit.value) {
     const changes: Partial<Project> = {}
     if (name.value !== props.initialProject!.name) changes.name = name.value
@@ -123,6 +128,9 @@ async function handleSubmit() {
     if (allowedTools.value !== oldTools) changes.allowedTools = tools
     if (webhookUrl.value !== (props.initialProject!.webhookUrl ?? '')) changes.webhookUrl = webhookUrl.value || undefined
     if (webhookEnabled.value !== (props.initialProject!.webhookEnabled ?? false)) changes.webhookEnabled = webhookEnabled.value
+    if (webhookNotifyOnFailure.value !== (props.initialProject!.webhookNotifyOnFailure ?? true)) changes.webhookNotifyOnFailure = webhookNotifyOnFailure.value
+    const oldMentioned = props.initialProject!.webhookMentionedList?.join(',') ?? ''
+    if (webhookMentionedList.value !== oldMentioned) changes.webhookMentionedList = mentioned.length > 0 ? mentioned : undefined
     emit('submit', changes)
     return
   }
@@ -134,6 +142,8 @@ async function handleSubmit() {
     allowedTools: tools,
     webhookUrl: webhookUrl.value || undefined,
     webhookEnabled: webhookEnabled.value,
+    webhookNotifyOnFailure: webhookNotifyOnFailure.value,
+    webhookMentionedList: mentioned.length > 0 ? mentioned : undefined,
   })
   if (result.ok) {
     name.value = ''
@@ -146,6 +156,8 @@ async function handleSubmit() {
     allowedTools.value = 'Read,Edit,Bash'
     webhookUrl.value = ''
     webhookEnabled.value = false
+    webhookNotifyOnFailure.value = true
+    webhookMentionedList.value = ''
     emit('submit')
   }
 }
@@ -209,6 +221,20 @@ async function handleSubmit() {
       <p v-if="webhookTestMessage" class="test-result" :class="{ ok: webhookTestMessage.ok, err: !webhookTestMessage.ok }">
         {{ webhookTestMessage.text }}
       </p>
+
+      <label class="toggle-label">
+        <input v-model="webhookNotifyOnFailure" type="checkbox" :disabled="!webhookEnabled" />
+        <span>任务失败时也发送通知</span>
+      </label>
+
+      <label>@提及成员（可选，逗号分隔的成员账号，@all 提及所有人）</label>
+      <input
+        v-model="webhookMentionedList"
+        class="glass-input"
+        placeholder="如：zhangsan,lisi 或 @all"
+        :disabled="!webhookEnabled"
+      />
+
       <p class="hint">在项目中的任务开发完成（进入待审核）时，向企业微信机器人推送 Markdown 消息。</p>
     </fieldset>
 

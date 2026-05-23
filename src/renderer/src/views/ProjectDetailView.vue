@@ -134,6 +134,14 @@ async function handleTaskCreated() {
         <span class="info-label">Webhook</span>
         <span class="info-value mono">{{ project.webhookUrl }}</span>
       </div>
+      <div v-if="project.webhookEnabled" class="info-row">
+        <span class="info-label">失败时通知</span>
+        <span class="info-value">{{ (project.webhookNotifyOnFailure ?? true) ? '是' : '否' }}</span>
+      </div>
+      <div v-if="project.webhookEnabled && project.webhookMentionedList?.length" class="info-row">
+        <span class="info-label">@提及成员</span>
+        <span class="info-value">{{ project.webhookMentionedList.join(', ') }}</span>
+      </div>
       <div class="info-row">
         <span class="info-label">创建时间</span>
         <span class="info-value">{{ new Date(project.createdAt).toLocaleString() }}</span>

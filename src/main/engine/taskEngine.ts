@@ -7,7 +7,7 @@ import { getRunner } from './runnerRegistry'
 import { autoCommit } from './gitAutoCommit'
 import { createTaskRepository } from '../repositories/taskRepository'
 import { createProjectRepository } from '../repositories/projectRepository'
-import { sendWecomMessage, buildTaskCompletedMarkdown } from './wecomNotifier'
+import { sendWecomMessage, buildTaskCompletedMarkdown, buildTaskFailedMarkdown, buildMentionTextMessage } from './wecomNotifier'
 import { computeTimeTrackingChanges } from '../utils/taskTimeTracking'
 import type { Task } from '../../shared/types'
 import { TASK_STATUS } from '../../shared/constants'
@@ -287,6 +287,15 @@ export class TaskEngine extends EventEmitter {
               console.log('[wecom] 通知已发送')
             }
           })
+          // @提及（独立的 text 消息）
+          const mentioned = project.webhookMentionedList?.filter(Boolean) ?? []
+          if (mentioned.length > 0) {
+            const mentionMsg = buildMentionTextMessage(
+              mentioned,
+              `任务「${task.title}」已开发完成，待审核`,
+            )
+            void sendWecomMessage(project.webhookUrl, mentionMsg)
+          }
         }
 
         this.emit('task:completed', task._id, result)
@@ -301,6 +310,29 @@ export class TaskEngine extends EventEmitter {
           updatedAt: new Date().toISOString(),
           ...endTimeChanges,
         })
+
+        // 失败通知（默认开启，可通过 webhookNotifyOnFailure=false 关闭）
+        if (
+          project.webhookEnabled &&
+          project.webhookUrl &&
+          project.webhookNotifyOnFailure !== false
+        ) {
+          const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+          const failMsg = buildTaskFailedMarkdown({
+            projectName: project.name,
+            taskTitle: task.title,
+            taskId: task._id,
+            prompt: task.prompt,
+            error: result.error ?? '执行失败',
+            durationMs: totalSec * 1000,
+          })
+          void sendWecomMessage(project.webhookUrl, failMsg).then((res) => {
+            if (!res.success) {
+              console.error('[wecom] 失败通知发送失败:', res.error)
+            }
+          })
+        }
+
         this.emit('task:failed', task._id, result.error)
       }
     } catch (err: any) {
@@ -313,6 +345,25 @@ export class TaskEngine extends EventEmitter {
         updatedAt: new Date().toISOString(),
         ...endTimeChanges,
       })
+
+      // 异常情况下的失败通知
+      if (
+        project.webhookEnabled &&
+        project.webhookUrl &&
+        project.webhookNotifyOnFailure !== false
+      ) {
+        const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+        const failMsg = buildTaskFailedMarkdown({
+          projectName: project.name,
+          taskTitle: task.title,
+          taskId: task._id,
+          prompt: task.prompt,
+          error: `异常: ${err.message}`,
+          durationMs: totalSec * 1000,
+        })
+        void sendWecomMessage(project.webhookUrl, failMsg).catch(() => undefined)
+      }
+
       this.emit('task:failed', task._id, err.message)
     } finally {
       this.runningTasks.delete(task._id)
