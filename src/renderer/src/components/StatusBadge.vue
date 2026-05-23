@@ -2,12 +2,20 @@
 import type { TaskStatus } from '../../../shared/constants'
 import { STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
 
-defineProps<{ status: TaskStatus }>()
+interface Props {
+  status: TaskStatus
+  size?: 'normal' | 'small'
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  size: 'normal'
+})
 </script>
 
 <template>
   <span
     class="badge"
+    :class="{ 'badge-small': size === 'small' }"
     :style="{
       backgroundColor: STATUS_COLOR[status] + '18',
       color: STATUS_COLOR[status],
@@ -29,5 +37,10 @@ defineProps<{ status: TaskStatus }>()
   border: 1px solid transparent;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+.badge-small {
+  font-size: 0.625rem;
+  padding: 1px 4px;
 }
 </style>

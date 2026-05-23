@@ -819,7 +819,7 @@ header .actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 4px;
   flex-wrap: wrap;
   gap: var(--space-sm);
 }
@@ -827,20 +827,40 @@ header .actions {
 .task-list {
   list-style: none;
   padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 0px;
 }
 
 /* 手机端更紧凑的间隔 */
 @media (max-width: 640px) {
+  .tasks-header {
+    margin-bottom: 2px;
+  }
+
   .task-list {
-    gap: 2px;
+    gap: 0px;
   }
 
   /* 为TaskListItem添加紧凑模式类 */
   .task-list :deep(.task-compact-item) {
-    padding: var(--space-xs) var(--space-sm);
+    padding: 3px 4px;
+    min-height: 26px;
+  }
+
+  .task-list :deep(.task-compact-item .compact-title) {
+    font-size: 0.6875rem;
+  }
+
+  .task-list :deep(.task-compact-item .compact-meta) {
+    font-size: 0.5625rem;
+  }
+
+  .task-list :deep(.task-compact-item .compact-actions .btn-icon) {
+    min-height: 18px;
+    min-width: 18px;
+    max-width: 18px;
   }
 }
 

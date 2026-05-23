@@ -166,17 +166,15 @@ function onDragEnd(e: DragEvent) {
     @dragend="onDragEnd"
   >
     <div class="compact-main">
-      <div class="compact-row">
-        <StatusBadge :status="task.status" />
-        <RouterLink
-          :to="{ name: 'task-detail', params: { id: task._id } }"
-          class="compact-title"
-          @click="emit('navigate', task._id)"
-        >
-          {{ task.title }}
-        </RouterLink>
-      </div>
+      <RouterLink
+        :to="{ name: 'task-detail', params: { id: task._id } }"
+        class="compact-title"
+        @click="emit('navigate', task._id)"
+      >
+        {{ task.title }}
+      </RouterLink>
       <div class="compact-meta">
+        <StatusBadge :status="task.status" size="small" />
         <span class="kind">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
         <span v-if="projectName" class="project">{{ projectName }}</span>
         <span
@@ -190,8 +188,12 @@ function onDragEnd(e: DragEvent) {
       </div>
     </div>
     <div class="compact-actions">
-      <button class="glass-button btn-edit" @click="emit('edit', task._id)">编辑</button>
-      <button class="glass-button danger btn-delete" @click="emit('delete', task._id)">删除</button>
+      <button class="glass-button btn-icon btn-edit" @click="emit('edit', task._id)">
+        <span>✏️</span>
+      </button>
+      <button class="glass-button btn-icon danger btn-delete" @click="emit('delete', task._id)">
+        <span>🗑️</span>
+      </button>
     </div>
   </li>
 </template>
@@ -494,48 +496,43 @@ function onDragEnd(e: DragEvent) {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Compact mode */
+/* Compact mode - 重新设计为超紧凑布局 */
 .task-compact-item {
-  padding: var(--space-sm) var(--space-md);
+  padding: 4px 6px;
   list-style: none;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
+  gap: 4px;
   transition: all var(--transition-fast);
   border-radius: var(--radius-sm);
-  min-height: 48px;
+  min-height: 28px;
+  border: 1px solid transparent;
 }
 
 .task-compact-item:hover {
   background: rgba(0, 0, 0, 0.02);
+  border-color: var(--glass-border-subtle);
 }
 
 .task-compact-item .compact-main {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.task-compact-item .compact-row {
-  display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  min-width: 0;
+  gap: 4px;
 }
 
 .task-compact-item .compact-title {
-  font-weight: 600;
-  font-size: 0.8125rem;
+  font-weight: 500;
+  font-size: 0.75rem;
   color: var(--color-text);
   text-decoration: none;
   transition: color var(--transition-fast);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .task-compact-item .compact-title:hover {
@@ -545,19 +542,23 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-  font-size: 0.6875rem;
+  gap: 2px;
+  flex-wrap: nowrap;
+  font-size: 0.625rem;
   color: var(--color-text-secondary);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .task-compact-item .compact-meta .kind {
-  font-weight: 600;
-  background: rgba(0, 0, 0, 0.04);
-  padding: 1px 5px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 1px 3px;
   border-radius: var(--radius-full);
   border: 1px solid var(--glass-border-subtle);
   transition: all var(--transition-fast);
+  white-space: nowrap;
+  font-size: 0.6rem;
 }
 
 .task-compact-item .compact-meta .kind:hover {
@@ -567,7 +568,12 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta .project {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  font-size: 0.6rem;
 }
 
 .task-compact-item .compact-meta .project::before {
@@ -578,14 +584,17 @@ function onDragEnd(e: DragEvent) {
   background: currentColor;
   border-radius: 50%;
   opacity: 0.5;
+  flex-shrink: 0;
 }
 
 .task-compact-item .compact-meta .duration {
   font-family: 'SF Mono', Monaco, monospace;
-  background: rgba(0, 0, 0, 0.04);
-  padding: 1px 5px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 1px 3px;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
+  white-space: nowrap;
+  font-size: 0.575rem;
 }
 
 .task-compact-item .compact-meta .duration:hover {
@@ -594,28 +603,40 @@ function onDragEnd(e: DragEvent) {
 
 .task-compact-item .compact-meta .duration-active {
   color: var(--color-accent, #007aff);
-  background: rgba(0, 122, 255, 0.08);
-  font-weight: 600;
+  background: rgba(0, 122, 255, 0.06);
+  font-weight: 500;
 }
 
 .task-compact-item .compact-actions {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
-  align-items: flex-start;
+  align-items: center;
 }
 
-.task-compact-item .compact-actions .glass-button {
-  font-size: 0.6875rem;
-  padding: 2px 6px;
-  min-height: 24px;
-  min-width: 48px;
+.task-compact-item .compact-actions .btn-icon {
+  font-size: 0.75rem;
+  padding: 2px;
+  min-height: 20px;
+  min-width: 20px;
+  max-width: 20px;
   transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
 }
 
-.task-compact-item .compact-actions .glass-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+.task-compact-item .compact-actions .btn-icon:hover {
+  transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--glass-border-subtle);
+}
+
+.task-compact-item .compact-actions .btn-icon span {
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 @keyframes pulse {
@@ -672,37 +693,61 @@ function onDragEnd(e: DragEvent) {
     padding: var(--space-xs) var(--space-sm);
   }
 
+  /* 优化移动端的紧凑模式 */
   .task-compact-item {
-    padding: var(--space-xs) var(--space-sm);
-    flex-wrap: wrap;
-    gap: var(--space-xs);
+    padding: 3px 6px;
+    min-height: 30px;
+    gap: 3px;
   }
 
   .task-compact-item .compact-main {
-    width: calc(100% - 100px);
-  }
-
-  .task-compact-item .compact-actions {
-    width: auto;
-  }
-
-  .task-compact-item .compact-actions .glass-button {
-    flex: 0 0 auto;
-    min-height: 32px;
-    font-size: 0.75rem;
-    min-width: 40px;
-  }
-
-  .task-compact-item .compact-row {
-    flex-wrap: wrap;
+    flex: 1;
+    gap: 1px;
+    min-width: 0;
   }
 
   .task-compact-item .compact-title {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    line-height: 1.1;
   }
 
   .task-compact-item .compact-meta {
-    font-size: 0.625rem;
+    font-size: 0.575rem;
+    gap: 2px;
+  }
+
+  .task-compact-item .compact-actions {
+    gap: 1px;
+  }
+
+  .task-compact-item .compact-actions .btn-icon {
+    min-height: 20px;
+    min-width: 20px;
+    max-width: 20px;
+    padding: 1px;
+  }
+
+  .task-compact-item .compact-actions .btn-icon span {
+    font-size: 0.7rem;
+  }
+
+  .task-compact-item .compact-meta .project {
+    max-width: 50px;
+  }
+
+  .task-compact-item .compact-meta .kind {
+    padding: 1px 2px;
+    font-size: 0.55rem;
+  }
+
+  .task-compact-item .compact-meta .duration {
+    padding: 1px 2px;
+    font-size: 0.55rem;
+  }
+
+  .task-compact-item .compact-meta :deep(.badge) {
+    padding: 1px 2px;
+    font-size: 0.55rem;
   }
 }
 </style>
