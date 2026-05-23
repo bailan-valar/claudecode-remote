@@ -11,12 +11,12 @@ const ProjectDetailView = () => import('../views/ProjectDetailView.vue')
 export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/login', name: 'login', component: LoginView, meta: { public: true } },
-    { path: '/', name: 'home', component: HomeView },
-    { path: '/projects', name: 'projects', component: ProjectsView },
-    { path: '/projects/:id', name: 'project-detail', component: ProjectDetailView },
-    { path: '/tasks', name: 'tasks', component: TasksView },
-    { path: '/tasks/:id', name: 'task-detail', component: TaskDetailView },
+    { path: '/login', name: 'login', component: LoginView, meta: { public: true, keepAlive: false } },
+    { path: '/', name: 'home', component: HomeView, meta: { keepAlive: true } },
+    { path: '/projects', name: 'projects', component: ProjectsView, meta: { keepAlive: true } },
+    { path: '/projects/:id', name: 'project-detail', component: ProjectDetailView, meta: { keepAlive: true } },
+    { path: '/tasks', name: 'tasks', component: TasksView, meta: { keepAlive: true } },
+    { path: '/tasks/:id', name: 'task-detail', component: TaskDetailView, meta: { keepAlive: true } },
   ],
 })
 

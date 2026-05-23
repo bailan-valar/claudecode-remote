@@ -48,7 +48,12 @@ const showSidebar = computed(() => auth.currentUser && !isMobile.value)
         </div>
       </aside>
       <main class="main">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <keep-alive>
+            <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive !== false" />
+          </keep-alive>
+          <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive === false" />
+        </RouterView>
       </main>
       <nav v-if="showMobileNav" class="mobile-nav glass">
         <RouterLink to="/" class="mobile-nav-item">
@@ -70,7 +75,12 @@ const showSidebar = computed(() => auth.currentUser && !isMobile.value)
       </nav>
     </template>
     <template v-else>
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <keep-alive>
+          <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive !== false" />
+        </keep-alive>
+        <component :is="Component" :key="$route.path" v-if="$route.meta.keepAlive === false" />
+      </RouterView>
     </template>
   </div>
 </template>

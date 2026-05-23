@@ -63,6 +63,7 @@ export class TaskEngine extends EventEmitter {
   private _concurrency: number
   private _provider?: string
   private projectLocks = new Map<string, Promise<void>>()
+  private stoppedTaskIds = new Set<string>()
 
   constructor(options: EngineOptions) {
     super()
@@ -145,7 +146,8 @@ export class TaskEngine extends EventEmitter {
     this.changesFeed?.cancel?.()
     this.changesFeed = undefined
 
-    for (const [, ctrl] of this.runningTasks) {
+    for (const [taskId, ctrl] of this.runningTasks) {
+      this.stoppedTaskIds.add(taskId)
       ctrl.abort()
     }
 
