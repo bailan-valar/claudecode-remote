@@ -64,8 +64,10 @@ export function buildTaskCompletedMarkdown(opts: {
   commitMessage?: string
   durationMs?: number
   taskUrl?: string
+  pendingCount?: number
 }): WecomMessage {
   const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
+  const pendingStr = opts.pendingCount != null ? `**待开发任务**: ${opts.pendingCount} 个` : ''
   const content = [
     `## ✅ 任务开发完成`,
     ``,
@@ -76,6 +78,7 @@ export function buildTaskCompletedMarkdown(opts: {
     `**日志条数**: ${opts.logsCount}`,
     opts.commitMessage ? `**Git Commit**: ${opts.commitMessage}` : '',
     opts.taskUrl ? `**任务详情**: [点击查看](${opts.taskUrl})` : '',
+    pendingStr,
     ``,
     `---`,
     `**Prompt 摘要**:`,
@@ -98,8 +101,10 @@ export function buildTaskFailedMarkdown(opts: {
   error: string
   durationMs?: number
   taskUrl?: string
+  pendingCount?: number
 }): WecomMessage {
   const durationStr = opts.durationMs != null ? formatDurationShort(opts.durationMs) : ''
+  const pendingStr = opts.pendingCount != null ? `**待开发任务**: ${opts.pendingCount} 个` : ''
   const content = [
     `## ❌ 任务执行失败`,
     ``,
@@ -107,6 +112,7 @@ export function buildTaskFailedMarkdown(opts: {
     `**任务**: ${opts.taskTitle}`,
     durationStr ? `**耗时**: ${durationStr}` : '',
     opts.taskUrl ? `**任务详情**: [点击查看](${opts.taskUrl})` : '',
+    pendingStr,
     ``,
     `**错误**:`,
     `> <font color="warning">${opts.error.slice(0, 500)}</font>`,

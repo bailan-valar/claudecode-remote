@@ -13,7 +13,7 @@ function buildEnv(project: Project): NodeJS.ProcessEnv {
   return env
 }
 
-function buildArgs(prompt: string, project: Project, resumeSessionId?: string): string[] {
+function buildArgs(project: Project, resumeSessionId?: string): string[] {
   const args: string[] = [
     '-p',
     '--output-format', 'stream-json',
@@ -24,7 +24,6 @@ function buildArgs(prompt: string, project: Project, resumeSessionId?: string): 
   if (resumeSessionId) {
     args.push('--resume', resumeSessionId)
   }
-  args.push(prompt)
   return args
 }
 
@@ -38,15 +37,21 @@ interface RunClaudeOptions {
 
 function runClaude(options: RunClaudeOptions): Promise<RunResult> {
   return new Promise((resolve) => {
-    const args = buildArgs(options.prompt, options.project, options.resumeSessionId)
+    const args = buildArgs(options.project, options.resumeSessionId)
     const env = buildEnv(options.project)
 
     const child = spawn('claude', args, {
       cwd: options.project.path,
       env,
       shell: process.platform === 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
+
+    // 通过 stdin 传递 prompt，避免 Windows 命令行截断多行参数
+    if (options.prompt) {
+      child.stdin.write(options.prompt)
+    }
+    child.stdin.end()
 
     let capturedSessionId: string | undefined
     let capturedResult: string | undefined

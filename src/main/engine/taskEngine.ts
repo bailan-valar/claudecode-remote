@@ -12,13 +12,27 @@ import { computeTimeTrackingChanges } from '../utils/taskTimeTracking'
 import type { Task } from '../../shared/types'
 import { TASK_STATUS } from '../../shared/constants'
 
-const DEFAULT_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${process.env.WEB_PORT || '3456'}`
+const DEFAULT_BASE_URL = process.env.APP_BASE_URL || 'https://remote-dev.capdien.site/#/'
 
 function buildTaskUrl(project: { siteUrl?: string }, taskId: string): string | undefined {
   const base = project.siteUrl?.trim() || DEFAULT_BASE_URL
   if (!base) return undefined
-  const cleanBase = base.replace(/\/$/, '')
+  const cleanBase = base.replace(/\/+$/, '')
+  // 兼容已包含 /# 路由前缀的地址
+  if (cleanBase.includes('/#')) {
+    return `${cleanBase}/tasks/${taskId}`
+  }
   return `${cleanBase}/#/tasks/${taskId}`
+}
+
+async function getProjectPendingCount(
+  taskRepo: ReturnType<typeof createTaskRepository>,
+  projectId: string,
+): Promise<number> {
+  const allTasks = await taskRepo.findAll()
+  return allTasks.filter(
+    (t) => t.projectId === projectId && (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PLAN_REQUIRED),
+  ).length
 }
 
 export interface EngineStatus {
@@ -291,6 +305,7 @@ export class TaskEngine extends EventEmitter {
         // 企业微信通知（非阻塞）
         if (project.webhookEnabled && project.webhookUrl) {
           const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+          const pendingCount = await getProjectPendingCount(taskRepo, task.projectId)
           const statusLabel = isPlanTask ? '计划待审核' : '待审核'
           const msg = buildTaskCompletedMarkdown({
             projectName: project.name,
@@ -302,6 +317,7 @@ export class TaskEngine extends EventEmitter {
             commitMessage: undefined,
             durationMs: totalSec * 1000,
             taskUrl: buildTaskUrl(project, task._id),
+            pendingCount,
           })
           void sendWecomMessage(project.webhookUrl, msg).then((res) => {
             if (!res.success) {
@@ -342,6 +358,7 @@ export class TaskEngine extends EventEmitter {
           project.webhookNotifyOnFailure !== false
         ) {
           const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+          const pendingCount = await getProjectPendingCount(taskRepo, task.projectId)
           const failMsg = buildTaskFailedMarkdown({
             projectName: project.name,
             taskTitle: task.title,
@@ -350,6 +367,7 @@ export class TaskEngine extends EventEmitter {
             error: result.error ?? '执行失败',
             durationMs: totalSec * 1000,
             taskUrl: buildTaskUrl(project, task._id),
+            pendingCount,
           })
           void sendWecomMessage(project.webhookUrl, failMsg).then((res) => {
             if (!res.success) {
@@ -379,6 +397,7 @@ export class TaskEngine extends EventEmitter {
         project.webhookNotifyOnFailure !== false
       ) {
         const totalSec = endTimeChanges.totalDuration ?? currentTask.totalDuration ?? 0
+        const pendingCount = await getProjectPendingCount(taskRepo, task.projectId)
         const failMsg = buildTaskFailedMarkdown({
           projectName: project.name,
           taskTitle: task.title,
@@ -387,6 +406,7 @@ export class TaskEngine extends EventEmitter {
           error: `异常: ${err.message}`,
           durationMs: totalSec * 1000,
           taskUrl: buildTaskUrl(project, task._id),
+          pendingCount,
         })
         void sendWecomMessage(project.webhookUrl, failMsg).catch(() => undefined)
       }
