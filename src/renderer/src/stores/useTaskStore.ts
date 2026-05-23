@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { apiClient } from '../api'
 import type { Task } from '../../../shared/types'
 import { TASK_STATUS, type TaskStatus } from '../../../shared/constants'
 
@@ -27,19 +28,19 @@ export const useTaskStore = defineStore('task', () => {
   async function fetch(projectId?: string) {
     isLoading.value = true
     currentProjectId.value = projectId ?? null
-    const result = await window.api.listTasks(projectId)
+    const result = await apiClient.listTasks(projectId)
     if (result.ok) tasks.value = result.tasks
     isLoading.value = false
   }
 
-  async function create(doc: Parameters<typeof window.api.createTask>[0]) {
-    const result = await window.api.createTask(doc)
+  async function create(doc: Parameters<typeof apiClient.createTask>[0]) {
+    const result = await apiClient.createTask(doc)
     if (result.ok) tasks.value = [...tasks.value, result.task]
     return result
   }
 
   async function update(id: string, changes: Partial<Task>) {
-    const result = await window.api.updateTask(id, changes)
+    const result = await apiClient.updateTask(id, changes)
     if (result.ok) {
       tasks.value = tasks.value.map((t) => (t._id === id ? result.task : t))
     }
@@ -51,7 +52,7 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   async function remove(id: string) {
-    const result = await window.api.deleteTask(id)
+    const result = await apiClient.deleteTask(id)
     if (result.ok) {
       tasks.value = tasks.value.filter((t) => t._id !== id)
     }

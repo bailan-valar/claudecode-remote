@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useProjectStore } from '../stores/useProjectStore'
+import { apiClient } from '../api'
 import type { Project } from '../../../shared/types'
 
 type Provider = 'anthropic' | 'zhipu' | 'kimi'
@@ -64,8 +65,10 @@ watch(llmProvider, (provider) => {
   }
 })
 
+const isElectron = typeof window !== 'undefined' && !!(window as any).api
+
 async function handleSelectDirectory() {
-  const result = await window.api.selectDirectory()
+  const result = await apiClient.selectDirectory()
   if (result.ok && result.path) {
     path.value = result.path
   }
@@ -128,8 +131,8 @@ async function handleSubmit() {
   <form class="project-form" @submit.prevent="handleSubmit">
     <input v-model="name" class="glass-input" placeholder="项目名称" required />
     <div class="path-input">
-      <input v-model="path" class="glass-input" placeholder="本地路径" required readonly />
-      <button type="button" class="glass-button" @click="handleSelectDirectory">选择文件夹</button>
+      <input v-model="path" class="glass-input" placeholder="本地路径" required :readonly="isElectron" />
+      <button v-if="isElectron" type="button" class="glass-button" @click="handleSelectDirectory">选择文件夹</button>
     </div>
     <textarea v-model="description" class="glass-input" placeholder="描述（可选）" rows="2" />
 

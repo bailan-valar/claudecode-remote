@@ -15,7 +15,7 @@ async function httpInvoke(method: string, path: string, body?: any): Promise<any
 }
 
 let sseSource: EventSource | null = null
-const sseListeners = new Map<string, Set<(data: any) => void>>()
+const sseListeners = new Map<string, Set<(...args: any[]) => void>>()
 
 function ensureSse(): EventSource {
   if (!sseSource || sseSource.readyState === EventSource.CLOSED) {
@@ -38,18 +38,18 @@ function ensureSse(): EventSource {
       const payload = JSON.parse((e as MessageEvent).data)
       // payload is [taskId, result] or single value
       const args = Array.isArray(payload) ? payload : [payload]
-      sseListeners.get('engine:task:completed')?.forEach((cb) => cb(args[0], args[1]))
+      sseListeners.get('engine:task:completed')?.forEach((cb) => cb(...args))
     })
     sseSource.addEventListener('engine:task:failed', (e) => {
       const payload = JSON.parse((e as MessageEvent).data)
       const args = Array.isArray(payload) ? payload : [payload]
-      sseListeners.get('engine:task:failed')?.forEach((cb) => cb(args[0], args[1]))
+      sseListeners.get('engine:task:failed')?.forEach((cb) => cb(...args))
     })
   }
   return sseSource
 }
 
-function registerSseListener(event: string, cb: (data: any) => void): () => void {
+function registerSseListener(event: string, cb: (...args: any[]) => void): () => void {
   ensureSse()
   if (!sseListeners.has(event)) {
     sseListeners.set(event, new Set())
@@ -99,8 +99,8 @@ const httpApi: Api = {
   getEngineProvider: () => httpInvoke('GET', '/api/engine/provider'),
   setEngineProvider: (name) => httpInvoke('POST', '/api/engine/provider', { name }),
   onEngineStatus: (cb) => registerSseListener('engine:status', cb),
-  onEngineTaskCompleted: (cb) => registerSseListener('engine:task:completed', cb as any),
-  onEngineTaskFailed: (cb) => registerSseListener('engine:task:failed', cb as any),
+  onEngineTaskCompleted: (cb) => registerSseListener('engine:task:completed', cb),
+  onEngineTaskFailed: (cb) => registerSseListener('engine:task:failed', cb),
 
   selectDirectory: () => Promise.resolve({ ok: false, error: '浏览器不支持系统目录选择' }),
 }
