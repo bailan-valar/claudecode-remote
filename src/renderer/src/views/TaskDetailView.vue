@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted, nextTick, computed } from 'vue'
+import { onMounted, ref, watch, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -14,7 +14,7 @@ import { formatDuration } from '../utils/formatDuration'
 import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
 import { TASK_STATUS, KIND_LABEL } from '../../../shared/constants'
 import { STATUS_LABEL } from '../utils/taskTransitions'
-import type { Task } from '../../../shared/types'
+import type { Task, StatusHistoryEntry } from '../../../shared/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,8 +26,11 @@ const task = ref<Task | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const liveDuration = ref(0)
-const logListRef = ref<HTMLElement | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
+
+// Tab 切换
+const activeTab = ref<'detail' | 'logs'>('detail')
+const selectedPhaseIndex = ref(0)
 
 // 追加任务
 const showAppendPanel = ref(false)
@@ -48,11 +51,59 @@ const parentTask = computed(() => {
   return taskStore.tasks.find((t) => t._id === task.value!.parentTaskId)
 })
 
-function scrollLogsToBottom() {
-  nextTick(() => {
-    if (logListRef.value) {
-      logListRef.value.scrollTop = logListRef.value.scrollHeight
+// 执行阶段列表
+const executionPhases = computed(() => {
+  if (!task.value) return []
+  if (task.value.statusHistory && task.value.statusHistory.length > 0) {
+    return task.value.statusHistory
+  }
+  // 兼容旧数据：基于 timeEntries
+  const phases: StatusHistoryEntry[] = []
+  if (task.value.timeEntries) {
+    for (const entry of task.value.timeEntries) {
+      phases.push({
+        status: entry.status ?? (task.value.isPlan ? 'planning' : 'developing'),
+        startedAt: entry.startedAt,
+        endedAt: entry.endedAt,
+      })
     }
+  }
+  // 当前状态兜底
+  if (phases.length === 0 || phases[phases.length - 1].endedAt) {
+    phases.push({
+      status: task.value.status,
+      startedAt: task.value.updatedAt || task.value.createdAt,
+    })
+  }
+  return phases
+})
+
+const selectedPhase = computed(() => executionPhases.value[selectedPhaseIndex.value])
+
+function formatPhaseTime(phase: StatusHistoryEntry) {
+  const start = new Date(phase.startedAt)
+  const end = phase.endedAt ? new Date(phase.endedAt) : null
+  const fmt = (d: Date) => {
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const HH = String(d.getHours()).padStart(2, '0')
+    const MM = String(d.getMinutes()).padStart(2, '0')
+    return `${yyyy}.${mm}.${dd} ${HH}:${MM}`
+  }
+  if (end) {
+    return `${fmt(start)} - ${fmt(end)}`
+  }
+  return `${fmt(start)} - 进行中`
+}
+
+function getPhaseLogs(phase: StatusHistoryEntry) {
+  if (!task.value) return []
+  const start = new Date(phase.startedAt).getTime()
+  const end = phase.endedAt ? new Date(phase.endedAt).getTime() : Date.now()
+  return task.value.logs.filter((log) => {
+    const t = new Date(log.timestamp).getTime()
+    return t >= start && t <= end
   })
 }
 
@@ -108,16 +159,6 @@ watch(
   (list) => {
     task.value = list.find((t) => t._id === taskId)
     startTimer()
-  },
-  { immediate: true },
-)
-
-watch(
-  () => task.value?.logs.length,
-  () => {
-    if (task.value?.logs.length) {
-      scrollLogsToBottom()
-    }
   },
   { immediate: true },
 )
@@ -237,7 +278,15 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
       />
     </div>
 
-    <section v-if="!isEditing" class="info glass">
+    <!-- 顶部 Tab -->
+    <div class="tabs-bar">
+      <button :class="['tab-button', { active: activeTab === 'detail' }]" @click="activeTab = 'detail'">详情</button>
+      <button :class="['tab-button', { active: activeTab === 'logs' }]" @click="activeTab = 'logs'">执行日志</button>
+    </div>
+
+    <!-- 详情 Tab -->
+    <div v-if="activeTab === 'detail'" class="tab-content">
+      <section v-if="!isEditing" class="info glass">
       <div class="info-row">
         <span class="info-label">状态</span>
         <span class="info-value">
@@ -289,6 +338,10 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
         <span class="info-label">优先级</span>
         <span class="info-value">{{ task.priority }}</span>
       </div>
+      <div v-if="task.claudeSessionId" class="info-row">
+        <span class="info-label">Claude Session ID</span>
+        <span class="info-value session-id">{{ task.claudeSessionId }}</span>
+      </div>
       <div class="info-row">
         <span class="info-label">创建时间</span>
         <span class="info-value">{{ new Date(task.createdAt).toLocaleString() }}</span>
@@ -329,26 +382,69 @@ async function handleCreateSubtask(data: { title: string; prompt: string }) {
       </div>
     </section>
 
-    <section v-if="task.logs.length" class="logs">
-      <h2 class="section-title">执行日志</h2>
-      <div ref="logListRef" class="log-list glass">
-        <div
-          v-for="(log, idx) in task.logs"
-          :key="idx"
-          :class="['log-entry', log.level]"
-        >
-          <span class="log-time">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
-          <pre class="log-message">{{ log.message }}</pre>
-        </div>
-      </div>
-    </section>
-
     <section class="transitions">
       <h2 class="section-title">状态流转</h2>
       <div class="transitions-panel glass">
-        <TaskStatusActions :status="task.status" @transition="handleTransition" />
+        <TaskStatusActions :status="task.status" :task="task" @transition="handleTransition" />
       </div>
     </section>
+    </div>
+
+    <!-- 执行日志 Tab -->
+    <div v-if="activeTab === 'logs'" class="tab-content execution-logs">
+      <div class="logs-sidebar glass">
+        <div
+          v-for="(phase, idx) in executionPhases"
+          :key="idx"
+          :class="['phase-item', { active: selectedPhaseIndex === idx }]"
+          @click="selectedPhaseIndex = idx"
+        >
+          <div class="phase-header">
+            <StatusBadge :status="phase.status" />
+            <span v-if="!phase.endedAt" class="phase-badge">当前</span>
+          </div>
+          <div class="phase-time">{{ formatPhaseTime(phase) }}</div>
+        </div>
+      </div>
+      <div class="logs-content glass">
+        <div v-if="selectedPhase" class="phase-detail">
+          <div class="phase-detail-header">
+            <h3>{{ STATUS_LABEL[selectedPhase.status] }}</h3>
+            <span class="phase-detail-time">{{ formatPhaseTime(selectedPhase) }}</span>
+          </div>
+          <div class="phase-detail-body">
+            <template v-if="selectedPhase.status === 'developing' || selectedPhase.status === 'planning'">
+              <div class="content-label">{{ selectedPhase.status === 'planning' ? '计划执行日志' : '开发日志' }}</div>
+              <div v-if="getPhaseLogs(selectedPhase).length" class="log-list">
+                <div
+                  v-for="(log, idx) in getPhaseLogs(selectedPhase)"
+                  :key="idx"
+                  :class="['log-entry', log.level]"
+                >
+                  <span class="log-time">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                  <pre class="log-message">{{ log.message }}</pre>
+                </div>
+              </div>
+              <div v-else class="content-empty">暂无日志</div>
+            </template>
+
+            <template v-else-if="selectedPhase.status === 'plan_reviewing'">
+              <div class="content-label">开发计划</div>
+              <pre class="content-block">{{ selectedPhase.result || task.planOutput || '无计划内容' }}</pre>
+            </template>
+
+            <template v-else-if="selectedPhase.status === 'reviewing'">
+              <div class="content-label">开发结果</div>
+              <pre class="content-block">{{ selectedPhase.result || task.result || '无结果内容' }}</pre>
+            </template>
+
+            <template v-else>
+              <div class="content-empty">该阶段暂无详细内容</div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <ConfirmDialog
       title="确认删除"
@@ -431,6 +527,15 @@ header .actions {
   line-height: 1.6;
 }
 
+.session-id {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.8125rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+}
+
 .timer-active {
   color: var(--color-accent, #007aff);
   font-weight: 600;
@@ -484,10 +589,6 @@ header .actions {
   border: 1px solid var(--glass-border-subtle);
 }
 
-.logs {
-  margin-top: var(--space-2xl);
-}
-
 .section-title {
   font-size: 1.125rem;
   font-weight: 600;
@@ -496,9 +597,8 @@ header .actions {
 }
 
 .log-list {
-  max-height: 400px;
+  max-height: 480px;
   overflow-y: auto;
-  padding: var(--space-md);
 }
 
 .log-entry {
@@ -644,6 +744,144 @@ header .actions {
   background: transparent;
 }
 
+.tabs-bar {
+  display: flex;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.tab-button {
+  padding: var(--space-sm) var(--space-lg);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.tab-button:hover {
+  color: var(--color-text);
+}
+
+.tab-button.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.execution-logs {
+  display: flex;
+  gap: var(--space-lg);
+  min-height: 500px;
+}
+
+.logs-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  padding: var(--space-md);
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.phase-item {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  margin-bottom: var(--space-sm);
+}
+
+.phase-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.phase-item.active {
+  background: rgba(0, 0, 0, 0.06);
+  border-left: 3px solid var(--color-accent);
+}
+
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.phase-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: rgba(0, 122, 255, 0.1);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-full);
+}
+
+.phase-time {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.logs-content {
+  flex: 1;
+  padding: var(--space-lg);
+  min-height: 500px;
+  overflow-y: auto;
+}
+
+.phase-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.phase-detail-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.phase-detail-time {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.content-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: var(--space-md);
+}
+
+.content-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  padding: var(--space-xl) 0;
+  text-align: center;
+}
+
+.content-block {
+  background: rgba(0, 0, 0, 0.04);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  border: 1px solid var(--glass-border-subtle);
+  max-height: 480px;
+  overflow-y: auto;
+}
+
 @media (max-width: 640px) {
   .task-detail {
     padding: 0;
@@ -660,6 +898,15 @@ header .actions {
   header .actions .glass-button {
     flex: 1;
     min-height: 40px;
+  }
+
+  .execution-logs {
+    flex-direction: column;
+  }
+
+  .logs-sidebar {
+    width: 100%;
+    max-height: 200px;
   }
 
   .transitions-panel :deep(.actions) {

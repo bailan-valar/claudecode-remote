@@ -19,3 +19,9 @@ ClaudeCode 多项目桌面客户端，基于 Electron + Vue 3 + PouchDB。
 - `Module did not self-register` 或 `NODE_MODULE_VERSION` 报错 -> 运行 `npx electron-rebuild`
 - sync 卡在 `connecting` -> 检查 `COUCHDB_URL` 是否可访问、HTTPS 证书有效、CouchDB CORS 允许
 - CouchDB 默认未开 CORS；需在 `local.ini` 加 `[chttpd] enable_cors = true` 和 `[cors] origins = *`（dev 阶段）
+
+"env": {
+      "CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS": "300000000",
+        "ANTHROPIC_AUTH_TOKEN": "sk-kimi-dKvRvifDWX3ef6AJvtwGz9gPHYUFoUd4PYlSWKMCaFnYB1rTwctnZgqXDuDOkwH5",
+        "ANTHROPIC_BASE_URL": "https://api.kimi.com/coding/"
+    },

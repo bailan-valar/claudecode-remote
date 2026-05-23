@@ -13,6 +13,7 @@ export const TASK_STATUS = {
   REVIEWING: 'reviewing',
   COMPLETED: 'completed',
   CLOSED: 'closed',
+  STOPPED: 'stopped',
 } as const
 
 export const TASK_PRIORITY = {

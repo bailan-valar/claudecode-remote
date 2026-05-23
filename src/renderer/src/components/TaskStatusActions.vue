@@ -3,10 +3,14 @@ import { computed } from 'vue'
 import type { TaskStatus } from '../../../shared/constants'
 import { getAllowedNext, TRANSITION_LABEL } from '../utils/taskTransitions'
 
-const props = defineProps<{ status: TaskStatus; disabled?: boolean }>()
+const props = defineProps<{
+  status: TaskStatus
+  disabled?: boolean
+  task?: { isPlan?: boolean }
+}>()
 const emit = defineEmits<{ transition: [status: TaskStatus] }>()
 
-const nextStates = computed(() => getAllowedNext(props.status))
+const nextStates = computed(() => getAllowedNext(props.status, props.task))
 </script>
 
 <template>

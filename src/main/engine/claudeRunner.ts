@@ -152,7 +152,7 @@ function runClaudeTask(
 ): Promise<RunResult> {
   return runClaude({
     project,
-    prompt: task.prompt,
+    prompt: task.prompt ?? '',
     resumeSessionId: task.claudeSessionId ?? undefined,
     onLog: options?.onLog,
     abortSignal: options?.abortSignal,

@@ -10,6 +10,7 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   reviewing: '待审核',
   completed: '已完成',
   closed: '已关闭',
+  stopped: '已停止',
 }
 
 export const STATUS_COLOR: Record<TaskStatus, string> = {
@@ -22,28 +23,37 @@ export const STATUS_COLOR: Record<TaskStatus, string> = {
   reviewing: '#af52de',
   completed: '#34c759',
   closed: '#ff3b30',
+  stopped: '#ff3b30',
+}
+
+interface TaskLike {
+  isPlan?: boolean
 }
 
 // 当前状态 → 允许流转到的状态列表
-export function getAllowedNext(status: TaskStatus): TaskStatus[] {
+export function getAllowedNext(status: TaskStatus, task?: TaskLike): TaskStatus[] {
   switch (status) {
     case 'planned':
       return [TASK_STATUS.PLAN_REQUIRED, TASK_STATUS.PENDING]
     case 'plan_required':
       return [TASK_STATUS.PLANNING]
     case 'planning':
-      return [TASK_STATUS.PLAN_REVIEWING]
+      return [TASK_STATUS.PLAN_REVIEWING, TASK_STATUS.STOPPED]
     case 'plan_reviewing':
       return [TASK_STATUS.PENDING, TASK_STATUS.CLOSED]
     case 'pending':
       return [TASK_STATUS.DEVELOPING]
     case 'developing':
-      return [TASK_STATUS.REVIEWING]
+      return [TASK_STATUS.REVIEWING, TASK_STATUS.STOPPED]
     case 'reviewing':
       return [TASK_STATUS.COMPLETED, TASK_STATUS.PENDING, TASK_STATUS.CLOSED]
     case 'completed':
       return []
     case 'closed':
+      return []
+    case 'stopped':
+      return task?.isPlan ? [TASK_STATUS.PLAN_REQUIRED] : [TASK_STATUS.PENDING]
+    default:
       return []
   }
 }
@@ -58,4 +68,5 @@ export const TRANSITION_LABEL: Record<string, string> = {
   reviewing: '提交审核',
   completed: '完成',
   closed: '关闭',
+  stopped: '停止',
 }
