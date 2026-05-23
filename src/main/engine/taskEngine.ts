@@ -3,6 +3,7 @@ import PQueueModule from 'p-queue'
 const PQueue = (PQueueModule as any).default || PQueueModule
 import type PouchDB from 'pouchdb'
 import { runClaudeTask, type LogEntry } from './claudeRunner'
+import { autoCommit } from './gitAutoCommit'
 import { createTaskRepository } from '../repositories/taskRepository'
 import { createProjectRepository } from '../repositories/projectRepository'
 import type { Task } from '../../shared/types'
@@ -199,7 +200,7 @@ export class TaskEngine extends EventEmitter {
     this.runningTasks.set(task._id, controller)
     this.emit('status', this.getStatus())
 
-    const logs: LogEntry[] = [...task.logs]
+    const logs: LogEntry[] = [...(task.logs ?? [])]
     const taskWithSession: Task = { ...task, claudeSessionId: inheritedSessionId }
 
     try {
@@ -211,11 +212,30 @@ export class TaskEngine extends EventEmitter {
         abortSignal: controller.signal,
       })
 
+      // 取消 pending 的日志定时器，避免与状态更新产生并发冲突
+      const existingTimer = this._logWriteTimers.get(task._id)
+      if (existingTimer) {
+        clearTimeout(existingTimer)
+        this._logWriteTimers.delete(task._id)
+      }
+      this._pendingLogs.delete(task._id)
+
       if (result.success) {
+        const commitResult = await autoCommit(project.path, task.title)
+        const commitLog: LogEntry = {
+          timestamp: new Date().toISOString(),
+          level: commitResult.success ? 'info' : 'warn',
+          message: commitResult.success
+            ? `[Git] ${commitResult.message}`
+            : `[Git] ${commitResult.error}`,
+        }
+        logs.push(commitLog)
+
         await taskRepo.update(task._id, {
           status: TASK_STATUS.REVIEWING,
           claudeSessionId: result.sessionId ?? inheritedSessionId,
           logs,
+          completedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         })
         this.emit('task:completed', task._id, result)
@@ -239,7 +259,8 @@ export class TaskEngine extends EventEmitter {
       this.emit('task:failed', task._id, err.message)
     } finally {
       this.runningTasks.delete(task._id)
-      this._flushLogWrite(task._id, logs)
+      this._logWriteTimers.delete(task._id)
+      this._pendingLogs.delete(task._id)
       this.emit('status', this.getStatus())
     }
   }

@@ -8,6 +8,7 @@ const props = defineProps<{
   tasks?: Task[]
   initialTask?: Task
   mode?: 'create' | 'edit'
+  defaultProjectId?: string
 }>()
 const emit = defineEmits<{
   submit: [changes?: Partial<Task>]
@@ -39,6 +40,8 @@ watch(() => props.initialTask, (t) => {
     prompt.value = t.prompt
     projectId.value = t.projectId
     parentTaskId.value = t.parentTaskId ?? null
+  } else if (props.defaultProjectId) {
+    projectId.value = props.defaultProjectId
   }
 }, { immediate: true })
 
@@ -56,7 +59,7 @@ async function handleSubmit() {
   const result = await taskStore.create({
     title: title.value,
     description: description.value || undefined,
-    prompt: prompt.value,
+    prompt: prompt.value || title.value,
     projectId: projectId.value,
     parentTaskId: parentTaskId.value ?? undefined,
   })
@@ -74,7 +77,7 @@ async function handleSubmit() {
 <template>
   <form class="task-form" @submit.prevent="handleSubmit">
     <input v-model="title" class="glass-input" placeholder="任务标题" required />
-    <select v-model="projectId" class="glass-input" required>
+    <select v-if="!props.defaultProjectId" v-model="projectId" class="glass-input" required>
       <option value="" disabled>选择项目</option>
       <option v-for="p in projects" :key="p._id" :value="p._id">{{ p.name }}</option>
     </select>

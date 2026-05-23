@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
 import ProjectForm from '../components/ProjectForm.vue'
+import TaskForm from '../components/TaskForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import type { Project } from '../../../shared/types'
 
@@ -16,6 +17,7 @@ const projectId = route.params.id as string
 const project = ref<Project | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
+const showCreateTask = ref(false)
 
 onMounted(() => {
   project.value = projectStore.projects.find((p) => p._id === projectId)
@@ -43,6 +45,11 @@ async function handleUpdate(changes?: Partial<Project>) {
 async function handleDelete() {
   const result = await projectStore.remove(projectId)
   if (result.ok) router.push({ name: 'projects' })
+}
+
+async function handleTaskCreated() {
+  showCreateTask.value = false
+  await taskStore.fetch(projectId)
 }
 </script>
 
@@ -99,7 +106,23 @@ async function handleDelete() {
     </section>
 
     <section class="tasks">
-      <h2 class="section-title">关联任务（{{ taskStore.filteredTasks.length }}）</h2>
+      <div class="tasks-header">
+        <h2 class="section-title">关联任务（{{ taskStore.filteredTasks.length }}）</h2>
+        <button v-if="!showCreateTask" class="glass-button primary" @click="showCreateTask = true">新增任务</button>
+        <button v-else class="glass-button" @click="showCreateTask = false">取消</button>
+      </div>
+
+      <div v-if="showCreateTask" class="form-panel glass">
+        <TaskForm
+          :projects="project ? [project] : []"
+          :tasks="taskStore.filteredTasks"
+          :default-project-id="projectId"
+          mode="create"
+          @submit="handleTaskCreated"
+          @cancel="showCreateTask = false"
+        />
+      </div>
+
       <ul v-if="taskStore.filteredTasks.length" class="task-list">
         <li v-for="t in taskStore.filteredTasks" :key="t._id" class="task-item glass glass-hover">
           <RouterLink :to="{ name: 'task-detail', params: { id: t._id } }" class="task-link">
@@ -186,6 +209,19 @@ header .actions {
 
 .tasks {
   margin-top: var(--space-2xl);
+}
+
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.tasks-header .section-title {
+  margin-bottom: 0;
 }
 
 .section-title {

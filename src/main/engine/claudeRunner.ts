@@ -69,6 +69,7 @@ export function runClaudeTask(
     let capturedResult: string | undefined
     let stderrBuf = ''
     const logBuffer: LogEntry[] = []
+    let stdoutBuf = ''
     let finished = false
 
     function finish(result: RunResult) {
@@ -86,7 +87,9 @@ export function runClaudeTask(
 
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => {
-      const lines = chunk.split(/\r?\n/)
+      stdoutBuf += chunk
+      const lines = stdoutBuf.split(/\r?\n/)
+      stdoutBuf = lines.pop() ?? ''
       for (const line of lines) {
         if (!line.trim()) continue
         try {
