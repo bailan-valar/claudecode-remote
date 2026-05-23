@@ -14,11 +14,25 @@ interface Props {
   projectName?: string
   tick?: number
   draggable?: boolean
+  showPriority?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   mode: 'list',
+  showPriority: false,
 })
+
+const PRIORITY_LABEL: Record<string, string> = {
+  low: '低',
+  medium: '中',
+  high: '高',
+}
+
+const PRIORITY_COLOR: Record<string, string> = {
+  low: '#34c759',
+  medium: '#ff9500',
+  high: '#ff3b30',
+}
 
 const emit = defineEmits<{
   navigate: [taskId: string]
@@ -63,6 +77,17 @@ function onDragEnd(e: DragEvent) {
     <div class="row">
       <StatusBadge :status="task.status" />
       <span class="kind-badge">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
+      <span
+        v-if="showPriority"
+        class="priority-badge"
+        :style="{
+          backgroundColor: PRIORITY_COLOR[task.priority] + '18',
+          color: PRIORITY_COLOR[task.priority],
+          borderColor: PRIORITY_COLOR[task.priority] + '30',
+        }"
+      >
+        {{ PRIORITY_LABEL[task.priority] ?? task.priority }}
+      </span>
       <RouterLink
         :to="{ name: 'task-detail', params: { id: task._id } }"
         class="title"
@@ -181,6 +206,18 @@ function onDragEnd(e: DragEvent) {
   border-radius: var(--radius-full);
   white-space: nowrap;
   border: 1px solid var(--glass-border-subtle);
+}
+
+.task-list-item .priority-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .task-list-item .project {
@@ -356,6 +393,19 @@ function onDragEnd(e: DragEvent) {
   .task-kanban-item .card-actions .glass-button {
     min-height: 36px;
     font-size: 0.8125rem;
+  }
+
+  /* 手机端更紧凑的样式 */
+  .task-list-item.compact {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .task-list-item.compact .row {
+    margin-bottom: var(--space-xs);
+  }
+
+  .task-compact-item {
+    padding: var(--space-sm) var(--space-md);
   }
 }
 </style>
