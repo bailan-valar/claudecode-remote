@@ -24,7 +24,7 @@ const description = ref('')
 const prompt = ref('')
 const projectId = ref('')
 const parentTaskId = ref<string | null>(null)
-const status = ref<Task['status']>('planned')
+const status = ref<Task['status']>('pending')
 const kind = ref<Task['kind']>('task')
 const isPlan = ref(false)
 
@@ -66,7 +66,7 @@ watch(kind, (newKind, oldKind) => {
 
 watch(isPlan, (val) => {
   if (!isEdit.value) {
-    status.value = val ? 'plan_required' : 'planned'
+    status.value = val ? 'plan_required' : 'pending'
   }
 })
 
@@ -100,7 +100,7 @@ async function handleSubmit() {
     prompt.value = ''
     projectId.value = ''
     parentTaskId.value = null
-    status.value = 'planned'
+    status.value = 'pending'
     kind.value = 'task'
     isPlan.value = false
     emit('submit')
