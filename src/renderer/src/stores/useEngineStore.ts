@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, onMounted, onUnmounted } from 'vue'
+import { apiClient } from '../api'
 
 export interface EngineStatus {
   running: boolean
@@ -27,28 +28,28 @@ export const useEngineStore = defineStore('engine', () => {
   let unsubFailed: (() => void) | null = null
 
   async function fetchStatus() {
-    const result = await window.api.getEngineStatus()
+    const result = await apiClient.getEngineStatus()
     if (result.ok && result.status) {
       status.value = result.status
     }
   }
 
   async function fetchProviders() {
-    const result = await window.api.listEngineProviders()
+    const result = await apiClient.listEngineProviders()
     if (result.ok && result.providers) {
       providers.value = result.providers
     }
   }
 
   async function fetchProvider() {
-    const result = await window.api.getEngineProvider()
+    const result = await apiClient.getEngineProvider()
     if (result.ok && result.provider) {
       status.value.provider = result.provider
     }
   }
 
   async function setProvider(name: string) {
-    const result = await window.api.setEngineProvider(name)
+    const result = await apiClient.setEngineProvider(name)
     if (result.ok) {
       status.value.provider = name
     }
@@ -56,43 +57,43 @@ export const useEngineStore = defineStore('engine', () => {
   }
 
   async function start() {
-    const result = await window.api.startEngine()
+    const result = await apiClient.startEngine()
     if (result.ok) await fetchStatus()
     return result
   }
 
   async function stop() {
-    const result = await window.api.stopEngine()
+    const result = await apiClient.stopEngine()
     if (result.ok) await fetchStatus()
     return result
   }
 
   async function pause() {
-    const result = await window.api.pauseEngine()
+    const result = await apiClient.pauseEngine()
     if (result.ok) await fetchStatus()
     return result
   }
 
   async function resume() {
-    const result = await window.api.resumeEngine()
+    const result = await apiClient.resumeEngine()
     if (result.ok) await fetchStatus()
     return result
   }
 
   async function setConcurrency(n: number) {
-    const result = await window.api.setEngineConcurrency(n)
+    const result = await apiClient.setEngineConcurrency(n)
     if (result.ok) await fetchStatus()
     return result
   }
 
   function listen() {
-    unsubStatus = window.api.onEngineStatus((s: EngineStatus) => {
+    unsubStatus = apiClient.onEngineStatus((s: EngineStatus) => {
       status.value = s
     })
-    unsubCompleted = window.api.onEngineTaskCompleted((taskId: string) => {
+    unsubCompleted = apiClient.onEngineTaskCompleted((taskId: string) => {
       console.log('[engine] task completed:', taskId)
     })
-    unsubFailed = window.api.onEngineTaskFailed((taskId: string, error: string) => {
+    unsubFailed = apiClient.onEngineTaskFailed((taskId: string, error: string) => {
       console.error('[engine] task failed:', taskId, error)
     })
   }
