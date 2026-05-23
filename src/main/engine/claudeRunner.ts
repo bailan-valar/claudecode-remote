@@ -1,18 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { Project, Task } from '../../shared/types'
-
-export interface RunResult {
-  success: boolean
-  result?: string
-  sessionId?: string
-  error?: string
-}
-
-export interface LogEntry {
-  timestamp: string
-  level: 'info' | 'warn' | 'error'
-  message: string
-}
+import type { TaskRunner, LogEntry, RunResult, RunOptions } from './runner'
 
 function buildEnv(project: Project): NodeJS.ProcessEnv {
   const env = { ...process.env }
@@ -40,18 +28,10 @@ function buildArgs(task: Task, project: Project, resumeSessionId?: string): stri
   return args
 }
 
-/**
- * 运行单个 Claude Code 任务。
- * @param onLog 实时日志回调（可选）
- * @param abortSignal 用于取消执行
- */
-export function runClaudeTask(
+function runClaudeTask(
   task: Task,
   project: Project,
-  options?: {
-    onLog?: (entry: LogEntry) => void
-    abortSignal?: AbortSignal
-  },
+  options?: RunOptions,
 ): Promise<RunResult> {
   return new Promise((resolve) => {
     const resumeSessionId = task.claudeSessionId ?? undefined
@@ -155,6 +135,11 @@ export function runClaudeTask(
       })
     })
   })
+}
+
+export const claudeRunner: TaskRunner = {
+  name: 'Claude Code',
+  runTask: runClaudeTask,
 }
 
 function extractReadableMessage(json: any): string | null {

@@ -4,6 +4,8 @@ import { authManager } from './index'
 import { createProjectRepository } from './repositories/projectRepository'
 import { createTaskRepository } from './repositories/taskRepository'
 import { TaskEngine } from './engine/taskEngine'
+import { loadEngineState, saveEngineState } from './engineState'
+import { computeTimeTrackingChanges } from './utils/taskTimeTracking'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   // --- Sync handlers ---
@@ -63,7 +65,10 @@ export function registerIpcHandlers(win: BrowserWindow) {
           }
         })
         setEngine(engine)
-        engine.start()
+        const state = loadEngineState()
+        if (state.running) {
+          engine.start()
+        }
       }
       console.log('[ipc] auth:login ok')
       return { ok: true, user }
@@ -182,6 +187,8 @@ export function registerIpcHandlers(win: BrowserWindow) {
       createdAt: now,
       updatedAt: now,
       createdVia: 'desktop',
+      timeEntries: [],
+      totalDuration: 0,
     })
     console.log('[ipc] task:create ok', task._id)
     return { ok: true, task }
@@ -193,7 +200,18 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const db = syncManager.getLocalDb()
     if (!db) return { ok: false, error: '未登录' }
     const repo = createTaskRepository(db)
-    const task = await repo.update(id, { ...changes, updatedAt: new Date().toISOString() })
+
+    // 自动计时：状态流转时记录时间片
+    let merged = { ...changes }
+    if (changes.status) {
+      const existing = await repo.findById(id)
+      if (existing) {
+        const timeChanges = computeTimeTrackingChanges(existing, changes.status)
+        merged = { ...merged, ...timeChanges }
+      }
+    }
+
+    const task = await repo.update(id, { ...merged, updatedAt: new Date().toISOString() })
     console.log('[ipc] task:update ok', task._rev)
     return { ok: true, task }
   })
@@ -221,11 +239,13 @@ export function registerIpcHandlers(win: BrowserWindow) {
     const engine = getEngine()
     if (engine) {
       engine.start()
+      saveEngineState({ running: true, concurrency: engine.concurrency })
       return { ok: true }
     }
     const db = syncManager.getLocalDb()
     if (!db) return { ok: false, error: '未登录' }
-    const newEngine = new TaskEngine({ db, concurrency: 1 })
+    const state = loadEngineState()
+    const newEngine = new TaskEngine({ db, concurrency: state.concurrency ?? 1 })
     newEngine.on('status', (status) => {
       if (!win.isDestroyed()) {
         win.webContents.send('engine:status', status)
@@ -233,12 +253,17 @@ export function registerIpcHandlers(win: BrowserWindow) {
     })
     setEngine(newEngine)
     newEngine.start()
+    saveEngineState({ running: true, concurrency: newEngine.concurrency })
     return { ok: true }
   })
 
   ipcMain.removeHandler('engine:stop')
   ipcMain.handle('engine:stop', async () => {
-    getEngine()?.stop?.()
+    const engine = getEngine()
+    if (engine) {
+      engine.stop()
+      saveEngineState({ running: false, concurrency: engine.concurrency })
+    }
     return { ok: true }
   })
 
@@ -256,7 +281,11 @@ export function registerIpcHandlers(win: BrowserWindow) {
 
   ipcMain.removeHandler('engine:setConcurrency')
   ipcMain.handle('engine:setConcurrency', async (_, n: number) => {
-    getEngine()?.setConcurrency?.(n)
+    const engine = getEngine()
+    if (engine) {
+      engine.setConcurrency(n)
+      saveEngineState({ running: engine.running, concurrency: n })
+    }
     return { ok: true }
   })
 

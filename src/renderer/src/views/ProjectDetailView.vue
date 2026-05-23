@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
 import ProjectForm from '../components/ProjectForm.vue'
 import TaskForm from '../components/TaskForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { formatDurationShort } from '../utils/formatDuration'
+import { calculateLiveDuration, isTracking } from '../utils/timeTracking'
 import type { Project } from '../../../shared/types'
 
 const route = useRoute()
@@ -98,6 +100,14 @@ async function handleTaskCreated() {
       <div v-if="project.llmConfig?.model" class="info-row">
         <span class="info-label">模型</span>
         <span class="info-value mono">{{ project.llmConfig.model }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">企业微信通知</span>
+        <span class="info-value">{{ project.webhookEnabled ? '已启用' : '未启用' }}</span>
+      </div>
+      <div v-if="project.webhookEnabled && project.webhookUrl" class="info-row">
+        <span class="info-label">Webhook</span>
+        <span class="info-value mono">{{ project.webhookUrl }}</span>
       </div>
       <div class="info-row">
         <span class="info-label">创建时间</span>

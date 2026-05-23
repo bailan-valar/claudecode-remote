@@ -35,6 +35,8 @@ const llmBaseUrl = ref('')
 const llmApiKey = ref('')
 const llmModel = ref('')
 const allowedTools = ref('Read,Edit,Bash')
+const webhookUrl = ref('')
+const webhookEnabled = ref(false)
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -48,6 +50,8 @@ watch(() => props.initialProject, (p) => {
     llmApiKey.value = p.llmConfig?.apiKey ?? ''
     llmModel.value = p.llmConfig?.model ?? ''
     allowedTools.value = p.allowedTools?.join(',') ?? 'Read,Edit,Bash'
+    webhookUrl.value = p.webhookUrl ?? ''
+    webhookEnabled.value = p.webhookEnabled ?? false
   }
 }, { immediate: true })
 
@@ -90,6 +94,8 @@ async function handleSubmit() {
     }
     const oldTools = props.initialProject!.allowedTools?.join(',') ?? 'Read,Edit,Bash'
     if (allowedTools.value !== oldTools) changes.allowedTools = tools
+    if (webhookUrl.value !== (props.initialProject!.webhookUrl ?? '')) changes.webhookUrl = webhookUrl.value || undefined
+    if (webhookEnabled.value !== (props.initialProject!.webhookEnabled ?? false)) changes.webhookEnabled = webhookEnabled.value
     emit('submit', changes)
     return
   }
@@ -99,6 +105,8 @@ async function handleSubmit() {
     description: description.value || undefined,
     llmConfig: buildLlmConfig(),
     allowedTools: tools,
+    webhookUrl: webhookUrl.value || undefined,
+    webhookEnabled: webhookEnabled.value,
   })
   if (result.ok) {
     name.value = ''
@@ -109,6 +117,8 @@ async function handleSubmit() {
     llmApiKey.value = ''
     llmModel.value = ''
     allowedTools.value = 'Read,Edit,Bash'
+    webhookUrl.value = ''
+    webhookEnabled.value = false
     emit('submit')
   }
 }
@@ -143,6 +153,23 @@ async function handleSubmit() {
 
       <label>允许的工具</label>
       <input v-model="allowedTools" class="glass-input" placeholder="Read,Edit,Bash" />
+    </fieldset>
+
+    <fieldset class="webhook-config glass">
+      <legend>企业微信通知</legend>
+      <label class="toggle-label">
+        <input v-model="webhookEnabled" type="checkbox" />
+        <span>任务完成后推送通知</span>
+      </label>
+
+      <label>Webhook URL</label>
+      <input
+        v-model="webhookUrl"
+        class="glass-input"
+        placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."
+        :disabled="!webhookEnabled"
+      />
+      <p class="hint">在项目中的任务开发完成（进入待审核）时，向企业微信机器人推送 Markdown 消息。</p>
     </fieldset>
 
     <div class="actions">
@@ -199,5 +226,59 @@ async function handleSubmit() {
 
 .llm-config .glass-input {
   margin-bottom: var(--space-xs);
+}
+
+.webhook-config {
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  margin-top: var(--space-sm);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.webhook-config legend {
+  font-weight: 600;
+  padding: 0 var(--space-sm);
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.webhook-config label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-xs);
+  color: var(--color-text-secondary);
+}
+
+.webhook-config .glass-input {
+  margin-bottom: var(--space-xs);
+}
+
+.webhook-config .glass-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-label {
+  display: flex !important;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm) !important;
+  cursor: pointer;
+}
+
+.toggle-label input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-xs);
+  line-height: 1.4;
 }
 </style>

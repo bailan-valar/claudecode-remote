@@ -7,6 +7,7 @@ defineProps<{
   projects: Project[]
   selectedProjectId: string | null
   selectedStatus: TaskStatus | null
+  hideStatus?: boolean
 }>()
 const emit = defineEmits<{
   updateProject: [id: string | null]
@@ -25,6 +26,7 @@ const emit = defineEmits<{
       <option v-for="p in projects" :key="p._id" :value="p._id">{{ p.name }}</option>
     </select>
     <select
+      v-if="!hideStatus"
       :value="selectedStatus ?? ''"
       class="glass-input"
       @change="emit('updateStatus', (($event.target as HTMLSelectElement).value as TaskStatus) || null)"

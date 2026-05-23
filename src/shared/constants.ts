@@ -20,3 +20,10 @@ export const TASK_PRIORITY = {
 
 export type TaskStatus = (typeof TASK_STATUS)[keyof typeof TASK_STATUS]
 export type TaskPriority = (typeof TASK_PRIORITY)[keyof typeof TASK_PRIORITY]
+
+export const ENGINE_PROVIDER = {
+  CLAUDE: 'claude',
+  MOCK: 'mock',
+} as const
+
+export type EngineProvider = (typeof ENGINE_PROVIDER)[keyof typeof ENGINE_PROVIDER]

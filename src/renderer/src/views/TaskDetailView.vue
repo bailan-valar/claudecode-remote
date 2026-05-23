@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -7,6 +7,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import TaskStatusActions from '../components/TaskStatusActions.vue'
 import TaskForm from '../components/TaskForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { formatDuration } from '../utils/formatDuration'
+import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
 import type { Task } from '../../../shared/types'
 
 const route = useRoute()
@@ -18,6 +20,30 @@ const taskId = route.params.id as string
 const task = ref<Task | undefined>()
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
+const liveDuration = ref(0)
+let timerId: ReturnType<typeof setInterval> | null = null
+
+function startTimer() {
+  stopTimer()
+  if (!task.value) return
+  liveDuration.value = calculateLiveDuration(task.value)
+  if (isTracking(task.value)) {
+    timerId = setInterval(() => {
+      if (task.value) {
+        liveDuration.value = calculateLiveDuration(task.value)
+      }
+    }, 1000)
+  }
+}
+
+function stopTimer() {
+  if (timerId) {
+    clearInterval(timerId)
+    timerId = null
+  }
+}
+
+onUnmounted(() => stopTimer())
 
 onMounted(() => {
   task.value = taskStore.tasks.find((t) => t._id === taskId)
@@ -29,6 +55,7 @@ watch(
   () => taskStore.tasks,
   (list) => {
     task.value = list.find((t) => t._id === taskId)
+    startTimer()
   },
   { immediate: true },
 )
@@ -105,6 +132,13 @@ async function handleDelete() {
       <div v-if="task.completedAt" class="info-row">
         <span class="info-label">完成时间</span>
         <span class="info-value">{{ new Date(task.completedAt).toLocaleString() }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">开发时长</span>
+        <span class="info-value" :class="{ 'timer-active': isTracking(task) }">
+          {{ formatDuration(liveDuration) }}
+          <span v-if="isTracking(task)" class="tracking-dot">●</span>
+        </span>
       </div>
     </section>
 
@@ -208,6 +242,22 @@ header .actions {
   font-size: 0.9375rem;
   color: var(--color-text);
   line-height: 1.6;
+}
+
+.timer-active {
+  color: var(--color-accent, #007aff);
+  font-weight: 600;
+}
+
+.tracking-dot {
+  color: #34c759;
+  margin-left: var(--space-xs);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .prompt-block {

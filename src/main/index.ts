@@ -5,6 +5,7 @@ import { SyncManager } from './db'
 import { AuthManager } from './auth'
 import { registerIpcHandlers } from './ipc'
 import { TaskEngine } from './engine/taskEngine'
+import { loadEngineState } from './engineState'
 
 let engine: TaskEngine | null = null
 
@@ -83,11 +84,14 @@ app.whenReady().then(() => {
   const win = createWindow()
   registerIpcHandlers(win)
 
-  // 启动任务引擎（若用户已登录）
+  // 启动任务引擎（若用户已登录且上次未手动停止）
   const db = syncManager.getLocalDb()
   if (db) {
-    engine = new TaskEngine({ db, concurrency: 1 })
-    engine.start()
+    const state = loadEngineState()
+    engine = new TaskEngine({ db, concurrency: state.concurrency ?? 1 })
+    if (state.running) {
+      engine.start()
+    }
   }
 
   app.on('activate', function () {

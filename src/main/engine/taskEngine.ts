@@ -2,10 +2,13 @@ import { EventEmitter } from 'node:events'
 import PQueueModule from 'p-queue'
 const PQueue = (PQueueModule as any).default || PQueueModule
 import type PouchDB from 'pouchdb'
-import { runClaudeTask, type LogEntry } from './claudeRunner'
+import type { LogEntry } from './runner'
+import { getRunner } from './runnerRegistry'
 import { autoCommit } from './gitAutoCommit'
 import { createTaskRepository } from '../repositories/taskRepository'
 import { createProjectRepository } from '../repositories/projectRepository'
+import { sendWecomMessage, buildTaskCompletedMarkdown } from './wecomNotifier'
+import { computeTimeTrackingChanges } from '../utils/taskTimeTracking'
 import type { Task } from '../../shared/types'
 import { TASK_STATUS } from '../../shared/constants'
 
@@ -23,8 +26,8 @@ export interface EngineOptions {
 }
 
 /**
- * 任务引擎：自动消费 pending 任务，调用 Claude Code 执行。
- * 支持项目级串行 + 全局并发控制。
+ * 任务引擎：自动消费 pending 任务，按项目配置调用对应执行引擎。
+ * 支持项目级串行 + 全局并发控制，执行引擎可插拔切换。
  */
 export class TaskEngine extends EventEmitter {
   private db: PouchDB.Database
@@ -169,13 +172,17 @@ export class TaskEngine extends EventEmitter {
     const taskRepo = createTaskRepository(this.db)
     const projectRepo = createProjectRepository(this.db)
 
+    const latestTask = await taskRepo.findById(task._id) ?? task
+
     const project = await projectRepo.findById(task.projectId)
     if (!project) {
       console.error('[engine] project not found:', task.projectId)
+      const timeChanges = computeTimeTrackingChanges(latestTask, TASK_STATUS.PENDING)
       await taskRepo.update(task._id, {
         status: TASK_STATUS.PENDING,
         reviewFeedback: '项目不存在',
         updatedAt: new Date().toISOString(),
+        ...timeChanges,
       })
       return
     }
@@ -189,10 +196,12 @@ export class TaskEngine extends EventEmitter {
       }
     }
 
+    const startTimeChanges = computeTimeTrackingChanges(latestTask, TASK_STATUS.DEVELOPING)
     await taskRepo.update(task._id, {
       status: TASK_STATUS.DEVELOPING,
       claudeSessionId: inheritedSessionId,
       updatedAt: new Date().toISOString(),
+      ...startTimeChanges,
     })
     this.emit('task:started', task._id)
 
@@ -204,7 +213,9 @@ export class TaskEngine extends EventEmitter {
     const taskWithSession: Task = { ...task, claudeSessionId: inheritedSessionId }
 
     try {
-      const result = await runClaudeTask(taskWithSession, project, {
+      const runner = getRunner(project.llmConfig?.provider)
+      console.log(`[engine] 使用执行引擎: ${runner.name} (provider=${project.llmConfig?.provider ?? 'anthropic'})`)
+      const result = await runner.runTask(taskWithSession, project, {
         onLog: (entry) => {
           logs.push(entry)
           this._throttledLogWrite(task._id, logs)
@@ -231,30 +242,60 @@ export class TaskEngine extends EventEmitter {
         }
         logs.push(commitLog)
 
+        const currentTask = await taskRepo.findById(task._id) ?? latestTask
+        const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.REVIEWING)
         await taskRepo.update(task._id, {
           status: TASK_STATUS.REVIEWING,
           claudeSessionId: result.sessionId ?? inheritedSessionId,
           logs,
           completedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          ...endTimeChanges,
         })
+
+        // 企业微信通知（非阻塞）
+        if (project.webhookEnabled && project.webhookUrl) {
+          const msg = buildTaskCompletedMarkdown({
+            projectName: project.name,
+            taskTitle: task.title,
+            taskId: task._id,
+            status: '待审核',
+            prompt: task.prompt,
+            logsCount: logs.length,
+            commitMessage: commitResult.success ? commitResult.message : undefined,
+          })
+          void sendWecomMessage(project.webhookUrl, msg).then((res) => {
+            if (!res.success) {
+              console.error('[wecom] 通知发送失败:', res.error)
+            } else {
+              console.log('[wecom] 通知已发送')
+            }
+          })
+        }
+
         this.emit('task:completed', task._id, result)
       } else {
+        const currentTask = await taskRepo.findById(task._id) ?? latestTask
+        const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.PENDING)
         await taskRepo.update(task._id, {
           status: TASK_STATUS.PENDING,
           reviewFeedback: result.error ?? '执行失败',
           claudeSessionId: result.sessionId ?? inheritedSessionId,
           logs,
           updatedAt: new Date().toISOString(),
+          ...endTimeChanges,
         })
         this.emit('task:failed', task._id, result.error)
       }
     } catch (err: any) {
+      const currentTask = await taskRepo.findById(task._id) ?? latestTask
+      const endTimeChanges = computeTimeTrackingChanges(currentTask, TASK_STATUS.PENDING)
       await taskRepo.update(task._id, {
         status: TASK_STATUS.PENDING,
         reviewFeedback: `异常: ${err.message}`,
         logs,
         updatedAt: new Date().toISOString(),
+        ...endTimeChanges,
       })
       this.emit('task:failed', task._id, err.message)
     } finally {

@@ -18,6 +18,8 @@ export interface Project extends BaseDoc {
     model?: string
   }
   allowedTools?: string[]
+  webhookUrl?: string
+  webhookEnabled?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -42,6 +44,11 @@ export interface Task extends BaseDoc {
   completedAt?: string | null
   createdVia: 'desktop' | 'mobile'
   reviewFeedback?: string
+  timeEntries?: Array<{
+    startedAt: string
+    endedAt?: string
+  }>
+  totalDuration?: number
 }
 
 export interface User {
