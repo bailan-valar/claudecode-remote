@@ -42,7 +42,7 @@ watch(() => props.initialTask, (t) => {
   if (t) {
     title.value = t.title
     description.value = t.description ?? ''
-    prompt.value = t.prompt
+    prompt.value = t.prompt ?? ''
     projectId.value = t.projectId
     parentTaskId.value = t.parentTaskId ?? null
     status.value = t.status
@@ -71,7 +71,7 @@ async function handleSubmit() {
     const changes: Partial<Task> = {}
     if (title.value !== props.initialTask!.title) changes.title = title.value
     if (description.value !== (props.initialTask!.description ?? '')) changes.description = description.value || undefined
-    if (prompt.value !== props.initialTask!.prompt) changes.prompt = prompt.value
+    if (prompt.value !== (props.initialTask!.prompt ?? '')) changes.prompt = prompt.value || undefined
     if (projectId.value !== props.initialTask!.projectId) changes.projectId = projectId.value
     if (parentTaskId.value !== props.initialTask!.parentTaskId) changes.parentTaskId = parentTaskId.value
     if (status.value !== props.initialTask!.status) changes.status = status.value
@@ -126,7 +126,7 @@ async function handleSubmit() {
       <option v-for="k in Object.values(TASK_KIND)" :key="k" :value="k">{{ KIND_LABEL[k] }}</option>
     </select>
     <textarea v-model="description" class="glass-input" placeholder="描述（可选）" rows="2" />
-    <textarea v-model="prompt" class="glass-input" placeholder="给 Claude Code 的 Prompt" rows="4" required />
+    <textarea v-model="prompt" class="glass-input" placeholder="给 Claude Code 的 Prompt（可选，执行时默认使用标题）" rows="4" />
     <div class="actions">
       <button type="submit" class="glass-button primary">{{ isEdit ? '保存' : '创建' }}</button>
       <button type="button" class="glass-button" @click="emit('cancel')">取消</button>

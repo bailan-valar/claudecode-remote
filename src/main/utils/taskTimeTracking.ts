@@ -1,7 +1,8 @@
-import type { Task } from '../../shared/types'
+import type { Task, StatusHistoryEntry } from '../../shared/types'
 import { TASK_STATUS, type TaskStatus } from '../../shared/constants'
 
 export interface TimeEntry {
+  status?: TaskStatus
   startedAt: string
   endedAt?: string
 }
@@ -10,8 +11,13 @@ export function computeTimeTrackingChanges(
   task: Task,
   newStatus: TaskStatus,
 ): Partial<Task> {
+  if (task.status === newStatus) {
+    return {}
+  }
+
   const now = new Date().toISOString()
   const entries: TimeEntry[] = [...(task.timeEntries ?? [])]
+  const history: StatusHistoryEntry[] = [...(task.statusHistory ?? [])]
   const changes: Partial<Task> = {}
 
   const lastEntry = entries[entries.length - 1]
@@ -28,9 +34,17 @@ export function computeTimeTrackingChanges(
 
   // 进入 tracking 状态：开始新计时（如果当前没有在计时）
   if (TRACKING_STATUSES.includes(newStatus) && !isCurrentlyTracking) {
-    entries.push({ startedAt: now })
+    entries.push({ startedAt: now, status: newStatus })
     changes.timeEntries = entries
   }
+
+  // 维护 statusHistory：关闭上一个区间，开启新区间
+  const lastHistory = history[history.length - 1]
+  if (lastHistory && !lastHistory.endedAt) {
+    lastHistory.endedAt = now
+  }
+  history.push({ status: newStatus, startedAt: now })
+  changes.statusHistory = history
 
   return changes
 }

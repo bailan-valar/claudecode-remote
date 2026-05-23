@@ -7,6 +7,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import TaskStatusActions from '../components/TaskStatusActions.vue'
 import TaskListItem from '../components/TaskListItem.vue'
 import TaskForm from '../components/TaskForm.vue'
+import TaskAppendPanel from '../components/TaskAppendPanel.vue'
+import TaskSubtaskPanel from '../components/TaskSubtaskPanel.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { formatDuration } from '../utils/formatDuration'
 import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
@@ -29,12 +31,9 @@ let timerId: ReturnType<typeof setInterval> | null = null
 
 // 追加任务
 const showAppendPanel = ref(false)
-const appendContent = ref('')
 
 // 新增子任务
 const showSubtaskPanel = ref(false)
-const subtaskTitle = ref('')
-const subtaskPrompt = ref('')
 const showPlanFullscreen = ref(false)
 
 const childTasks = computed(() => {
@@ -144,9 +143,9 @@ async function handleDelete() {
 }
 
 // ── 追加任务 ──
-async function handleAppend() {
-  if (!task.value || !appendContent.value.trim()) return
-  const newPrompt = task.value.prompt + '\n\n--- 追加 ---\n' + appendContent.value.trim()
+async function handleAppend(content: string) {
+  if (!task.value || !content.trim()) return
+  const newPrompt = task.value.prompt + '\n\n--- 追加 ---\n' + content.trim()
   const result = await taskStore.update(task.value._id, {
     prompt: newPrompt,
     status: TASK_STATUS.PENDING,
@@ -155,17 +154,16 @@ async function handleAppend() {
   })
   if (result.ok) {
     task.value = result.task
-    appendContent.value = ''
     showAppendPanel.value = false
   }
 }
 
 // ── 新增子任务 ──
-async function handleCreateSubtask() {
-  if (!task.value || !subtaskTitle.value.trim() || !subtaskPrompt.value.trim()) return
+async function handleCreateSubtask(data: { title: string; prompt: string }) {
+  if (!task.value || !data.title.trim()) return
   const result = await taskStore.create({
-    title: subtaskTitle.value.trim(),
-    prompt: subtaskPrompt.value.trim(),
+    title: data.title.trim(),
+    prompt: data.prompt.trim(),
     projectId: task.value.projectId,
     parentTaskId: task.value._id,
     claudeSessionId: task.value.claudeSessionId ?? undefined,
@@ -173,8 +171,6 @@ async function handleCreateSubtask() {
     kind: 'task',
   })
   if (result.ok) {
-    subtaskTitle.value = ''
-    subtaskPrompt.value = ''
     showSubtaskPanel.value = false
     await taskStore.fetch()
   }
@@ -230,25 +226,18 @@ async function handleCreateSubtask() {
 
     <!-- 追加任务面板 -->
     <div v-if="showAppendPanel" class="form-panel glass">
-      <h3 class="panel-title">追加任务内容</h3>
-      <p class="panel-hint">以下内容将追加到当前任务的 Prompt 末尾，并重新提交执行。</p>
-      <textarea v-model="appendContent" class="glass-input" placeholder="输入追加的指令或要求…" rows="4" />
-      <div class="panel-actions">
-        <button class="glass-button primary" :disabled="!appendContent.trim()" @click="handleAppend">追加并重新执行</button>
-        <button class="glass-button" @click="showAppendPanel = false">取消</button>
-      </div>
+      <TaskAppendPanel
+        @submit="handleAppend"
+        @cancel="showAppendPanel = false"
+      />
     </div>
 
     <!-- 新增子任务面板 -->
     <div v-if="showSubtaskPanel" class="form-panel glass">
-      <h3 class="panel-title">新增子任务</h3>
-      <p class="panel-hint">子任务将与父任务共用同一个 Claude Session 继续执行。</p>
-      <input v-model="subtaskTitle" class="glass-input" placeholder="子任务标题" required />
-      <textarea v-model="subtaskPrompt" class="glass-input" placeholder="给 Claude Code 的 Prompt" rows="4" required />
-      <div class="panel-actions">
-        <button class="glass-button primary" :disabled="!subtaskTitle.trim() || !subtaskPrompt.trim()" @click="handleCreateSubtask">创建子任务</button>
-        <button class="glass-button" @click="showSubtaskPanel = false">取消</button>
-      </div>
+      <TaskSubtaskPanel
+        @submit="handleCreateSubtask"
+        @cancel="showSubtaskPanel = false"
+      />
     </div>
 
     <section v-if="!isEditing" class="info glass">
@@ -550,26 +539,6 @@ header .actions {
 
 .transitions-panel {
   padding: var(--space-lg);
-}
-
-/* ── 追加 / 子任务面板 ── */
-.panel-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 var(--space-xs) 0;
-  color: var(--color-text);
-}
-
-.panel-hint {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  margin: 0 0 var(--space-md) 0;
-}
-
-.panel-actions {
-  display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-md);
 }
 
 /* ── 父任务链接 ── */

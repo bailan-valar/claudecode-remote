@@ -162,21 +162,23 @@ export async function listTasksAction(projectId?: string) {
   return { ok: true, tasks }
 }
 
-export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority' | 'timeEntries' | 'totalDuration' | 'kind'> & { status?: Task['status']; priority?: Task['priority']; kind?: Task['kind'] }) {
+export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority' | 'timeEntries' | 'totalDuration' | 'kind' | 'prompt'> & { prompt?: string; status?: Task['status']; priority?: Task['priority']; kind?: Task['kind'] }) {
   console.log('[api] task:create', (doc as any).title)
   const db = syncManager.getLocalDb()
   if (!db) return { ok: false, error: '未登录' }
   const repo = createTaskRepository(db)
   const now = new Date().toISOString()
+  const initialStatus = doc.status || (doc.isPlan ? 'plan_required' : 'planned')
   const timeEntries: TimeEntry[] = []
   let totalDuration = 0
-  if (doc.status === 'developing') {
-    timeEntries.push({ startedAt: now })
+  if (initialStatus === 'developing') {
+    timeEntries.push({ startedAt: now, status: initialStatus })
   }
+  const statusHistory = [{ status: initialStatus, startedAt: now }]
   const task = await repo.create({
     ...doc,
     type: 'task',
-    status: doc.status || (doc.isPlan ? 'plan_required' : 'planned'),
+    status: initialStatus,
     priority: doc.priority || 'medium',
     kind: doc.kind || 'task',
     logs: [],
@@ -185,6 +187,7 @@ export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' |
     createdVia: 'desktop',
     timeEntries,
     totalDuration,
+    statusHistory,
   } as any)
   console.log('[api] task:create ok', task._id)
   return { ok: true, task }

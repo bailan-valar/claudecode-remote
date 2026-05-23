@@ -250,7 +250,11 @@ export class TaskEngine extends EventEmitter {
     this.emit('status', this.getStatus())
 
     const logs: LogEntry[] = [...(task.logs ?? [])]
-    const taskWithSession: Task = { ...task, claudeSessionId: inheritedSessionId }
+    const taskWithSession: Task = {
+      ...task,
+      claudeSessionId: inheritedSessionId,
+      prompt: latestTask.prompt || latestTask.title,
+    }
 
     try {
       const runner = getRunner(this._provider ?? project.llmConfig?.provider)
@@ -276,6 +280,15 @@ export class TaskEngine extends EventEmitter {
         const endStatus = isPlanTask ? TASK_STATUS.PLAN_REVIEWING : TASK_STATUS.REVIEWING
         const endTimeChanges = computeTimeTrackingChanges(currentTask, endStatus)
 
+        // 将结果保存到当前历史阶段（reviewing / plan_reviewing）
+        if (endTimeChanges.statusHistory && result.result) {
+          const history = endTimeChanges.statusHistory as any[]
+          const currentEntry = history[history.length - 1]
+          if (currentEntry) {
+            currentEntry.result = result.result
+          }
+        }
+
         const updateData: any = {
           status: endStatus,
           claudeSessionId: result.sessionId ?? inheritedSessionId,
@@ -298,6 +311,7 @@ export class TaskEngine extends EventEmitter {
           }
           logs.push(commitLog)
           updateData.completedAt = new Date().toISOString()
+          updateData.result = result.result ?? ''
         }
 
         await taskRepo.update(task._id, updateData)
@@ -342,6 +356,13 @@ export class TaskEngine extends EventEmitter {
         const currentTask = await taskRepo.findById(task._id) ?? latestTask
         const errorStatus = isPlanTask ? TASK_STATUS.PLAN_REQUIRED : TASK_STATUS.PENDING
         const endTimeChanges = computeTimeTrackingChanges(currentTask, errorStatus)
+        if (endTimeChanges.statusHistory && result.error) {
+          const history = endTimeChanges.statusHistory as any[]
+          const closedEntry = history[history.length - 2]
+          if (closedEntry && (closedEntry.status === TASK_STATUS.DEVELOPING || closedEntry.status === TASK_STATUS.PLANNING)) {
+            closedEntry.result = `执行失败: ${result.error}`
+          }
+        }
         await taskRepo.update(task._id, {
           status: errorStatus,
           reviewFeedback: result.error ?? '执行失败',
@@ -382,6 +403,13 @@ export class TaskEngine extends EventEmitter {
       const currentTask = await taskRepo.findById(task._id) ?? latestTask
       const errorStatus = isPlanTask ? TASK_STATUS.PLAN_REQUIRED : TASK_STATUS.PENDING
       const endTimeChanges = computeTimeTrackingChanges(currentTask, errorStatus)
+      if (endTimeChanges.statusHistory && err.message) {
+        const history = endTimeChanges.statusHistory as any[]
+        const closedEntry = history[history.length - 2]
+        if (closedEntry && (closedEntry.status === TASK_STATUS.DEVELOPING || closedEntry.status === TASK_STATUS.PLANNING)) {
+          closedEntry.result = `执行异常: ${err.message}`
+        }
+      }
       await taskRepo.update(task._id, {
         status: errorStatus,
         reviewFeedback: `异常: ${err.message}`,
