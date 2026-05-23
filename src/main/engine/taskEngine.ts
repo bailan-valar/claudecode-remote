@@ -33,7 +33,7 @@ export interface EngineOptions {
  */
 export class TaskEngine extends EventEmitter {
   private db: PouchDB.Database
-  private queue: PQueue
+  private queue: InstanceType<typeof PQueue>
   private runningTasks = new Map<string, AbortController>()
   private changesFeed?: PouchDB.Core.Changes<{}>
   private _running = false
@@ -50,7 +50,7 @@ export class TaskEngine extends EventEmitter {
 
     this.queue.on('active', () => this.emit('status', this.getStatus()))
     this.queue.on('completed', () => this.emit('status', this.getStatus()))
-    this.queue.on('error', (err) => {
+    this.queue.on('error', (err: any) => {
       console.error('[engine] queue error:', err)
       this.emit('status', this.getStatus())
     })

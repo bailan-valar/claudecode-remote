@@ -16,10 +16,12 @@ export interface AuthManagerOptions {
 export class AuthManager {
   private db: PouchDB.Database
   private adminDb?: PouchDB.Database
+  private adminAuth?: { username: string; password: string }
   private baseUrl: string
 
   constructor(options: AuthManagerOptions) {
     this.baseUrl = options.baseUrl
+    this.adminAuth = options.adminAuth
     this.db = new PouchDB(options.baseUrl)
     if (options.adminAuth) {
       this.adminDb = new PouchDB(options.baseUrl, {
