@@ -9,6 +9,8 @@ import TaskForm from '../components/TaskForm.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { formatDuration } from '../utils/formatDuration'
 import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
+import { TASK_STATUS } from '../../../shared/constants'
+import { STATUS_LABEL } from '../utils/taskTransitions'
 import type { Task } from '../../../shared/types'
 
 const route = useRoute()
@@ -22,6 +24,25 @@ const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
 const liveDuration = ref(0)
 let timerId: ReturnType<typeof setInterval> | null = null
+
+// 内联编辑状态
+const isEditingStatus = ref(false)
+const editingStatus = ref<Task['status']>('planned')
+
+function startEditStatus() {
+  if (!task.value) return
+  editingStatus.value = task.value.status
+  isEditingStatus.value = true
+}
+
+async function saveStatus() {
+  if (!task.value) return
+  const newStatus = editingStatus.value
+  isEditingStatus.value = false
+  if (newStatus !== task.value.status) {
+    await handleTransition(newStatus)
+  }
+}
 
 function startTimer() {
   stopTimer()
@@ -86,7 +107,17 @@ async function handleDelete() {
   <div v-else class="task-detail">
     <header>
       <div class="header-left">
-        <StatusBadge :status="task.status" />
+        <template v-if="!isEditingStatus">
+          <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus" />
+        </template>
+        <select
+          v-else
+          v-model="editingStatus"
+          class="glass-input status-select"
+          @change="saveStatus"
+        >
+          <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
+        </select>
         <h1 v-if="!isEditing" class="page-title">{{ task.title }}</h1>
       </div>
       <div class="actions">
@@ -107,6 +138,22 @@ async function handleDelete() {
     </div>
 
     <section v-else class="info glass">
+      <div class="info-row">
+        <span class="info-label">状态</span>
+        <span class="info-value">
+          <template v-if="!isEditingStatus">
+            <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus" />
+          </template>
+          <select
+            v-else
+            v-model="editingStatus"
+            class="glass-input status-select"
+            @change="saveStatus"
+          >
+            <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
+          </select>
+        </span>
+      </div>
       <div class="info-row">
         <span class="info-label">描述</span>
         <span class="info-value">{{ task.description || '无' }}</span>
