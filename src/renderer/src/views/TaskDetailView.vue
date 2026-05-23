@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted, nextTick } from 'vue'
+import { onMounted, ref, watch, onUnmounted, nextTick, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
@@ -25,6 +25,27 @@ const showDeleteConfirm = ref(false)
 const liveDuration = ref(0)
 const logListRef = ref<HTMLElement | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
+
+// 追加任务
+const showAppendPanel = ref(false)
+const appendContent = ref('')
+
+// 新增子任务
+const showSubtaskPanel = ref(false)
+const subtaskTitle = ref('')
+const subtaskPrompt = ref('')
+
+const childTasks = computed(() => {
+  if (!task.value) return []
+  return taskStore.tasks
+    .filter((t) => t.parentTaskId === task.value!._id)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+})
+
+const parentTask = computed(() => {
+  if (!task.value?.parentTaskId) return undefined
+  return taskStore.tasks.find((t) => t._id === task.value!.parentTaskId)
+})
 
 function scrollLogsToBottom() {
   nextTick(() => {
@@ -119,6 +140,43 @@ async function handleDelete() {
   const result = await taskStore.remove(taskId)
   if (result.ok) router.push({ name: 'tasks' })
 }
+
+// ── 追加任务 ──
+async function handleAppend() {
+  if (!task.value || !appendContent.value.trim()) return
+  const newPrompt = task.value.prompt + '\n\n--- 追加 ---\n' + appendContent.value.trim()
+  const result = await taskStore.update(task.value._id, {
+    prompt: newPrompt,
+    status: TASK_STATUS.PENDING,
+    reviewFeedback: undefined,
+    completedAt: null,
+  })
+  if (result.ok) {
+    task.value = result.task
+    appendContent.value = ''
+    showAppendPanel.value = false
+  }
+}
+
+// ── 新增子任务 ──
+async function handleCreateSubtask() {
+  if (!task.value || !subtaskTitle.value.trim() || !subtaskPrompt.value.trim()) return
+  const result = await taskStore.create({
+    title: subtaskTitle.value.trim(),
+    prompt: subtaskPrompt.value.trim(),
+    projectId: task.value.projectId,
+    parentTaskId: task.value._id,
+    claudeSessionId: task.value.claudeSessionId ?? undefined,
+    status: TASK_STATUS.PENDING,
+    kind: 'task',
+  })
+  if (result.ok) {
+    subtaskTitle.value = ''
+    subtaskPrompt.value = ''
+    showSubtaskPanel.value = false
+    await taskStore.fetch()
+  }
+}
 </script>
 
 <template>
@@ -140,6 +198,8 @@ async function handleDelete() {
         <h1 v-if="!isEditing" class="page-title">{{ task.title }}</h1>
       </div>
       <div class="actions">
+        <button class="glass-button" :class="{ active: showAppendPanel }" @click="showAppendPanel = !showAppendPanel; showSubtaskPanel = false">追加任务</button>
+        <button class="glass-button" :class="{ active: showSubtaskPanel }" @click="showSubtaskPanel = !showSubtaskPanel; showAppendPanel = false">新增子任务</button>
         <button v-if="!isEditing" class="glass-button" @click="isEditing = true">编辑</button>
         <button v-else class="glass-button" @click="isEditing = false">取消编辑</button>
         <button class="glass-button danger" @click="showDeleteConfirm = true">删除</button>
@@ -156,7 +216,30 @@ async function handleDelete() {
       />
     </div>
 
-    <section v-else class="info glass">
+    <!-- 追加任务面板 -->
+    <div v-if="showAppendPanel" class="form-panel glass">
+      <h3 class="panel-title">追加任务内容</h3>
+      <p class="panel-hint">以下内容将追加到当前任务的 Prompt 末尾，并重新提交执行。</p>
+      <textarea v-model="appendContent" class="glass-input" placeholder="输入追加的指令或要求…" rows="4" />
+      <div class="panel-actions">
+        <button class="glass-button primary" :disabled="!appendContent.trim()" @click="handleAppend">追加并重新执行</button>
+        <button class="glass-button" @click="showAppendPanel = false">取消</button>
+      </div>
+    </div>
+
+    <!-- 新增子任务面板 -->
+    <div v-if="showSubtaskPanel" class="form-panel glass">
+      <h3 class="panel-title">新增子任务</h3>
+      <p class="panel-hint">子任务将与父任务共用同一个 Claude Session 继续执行。</p>
+      <input v-model="subtaskTitle" class="glass-input" placeholder="子任务标题" required />
+      <textarea v-model="subtaskPrompt" class="glass-input" placeholder="给 Claude Code 的 Prompt" rows="4" required />
+      <div class="panel-actions">
+        <button class="glass-button primary" :disabled="!subtaskTitle.trim() || !subtaskPrompt.trim()" @click="handleCreateSubtask">创建子任务</button>
+        <button class="glass-button" @click="showSubtaskPanel = false">取消</button>
+      </div>
+    </div>
+
+    <section v-if="!isEditing" class="info glass">
       <div class="info-row">
         <span class="info-label">状态</span>
         <span class="info-value">
@@ -176,6 +259,14 @@ async function handleDelete() {
       <div class="info-row">
         <span class="info-label">类型</span>
         <span class="info-value">{{ KIND_LABEL[task.kind] ?? task.kind ?? '任务' }}</span>
+      </div>
+      <div v-if="parentTask" class="info-row">
+        <span class="info-label">父任务</span>
+        <span class="info-value">
+          <RouterLink :to="{ name: 'task-detail', params: { id: parentTask._id } }" class="parent-link">
+            {{ parentTask.title }}
+          </RouterLink>
+        </span>
       </div>
       <div class="info-row">
         <span class="info-label">描述</span>
@@ -210,6 +301,21 @@ async function handleDelete() {
           <span v-if="isTracking(task)" class="tracking-dot">●</span>
         </span>
       </div>
+    </section>
+
+    <!-- 子任务列表 -->
+    <section v-if="childTasks.length" class="child-tasks">
+      <h2 class="section-title">子任务</h2>
+      <ul class="child-task-list">
+        <li v-for="ct in childTasks" :key="ct._id" class="child-task-item glass">
+          <div class="child-task-row">
+            <StatusBadge :status="ct.status" />
+            <RouterLink :to="{ name: 'task-detail', params: { id: ct._id } }" class="child-task-title">
+              {{ ct.title }}
+            </RouterLink>
+          </div>
+        </li>
+      </ul>
     </section>
 
     <section v-if="task.logs.length" class="logs">
@@ -420,6 +526,71 @@ header .actions {
 
 .transitions-panel {
   padding: var(--space-lg);
+}
+
+/* ── 追加 / 子任务面板 ── */
+.panel-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-xs) 0;
+  color: var(--color-text);
+}
+
+.panel-hint {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-md) 0;
+}
+
+.panel-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/* ── 父任务链接 ── */
+.parent-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.parent-link:hover {
+  text-decoration: underline;
+}
+
+/* ── 子任务列表 ── */
+.child-tasks {
+  margin-top: var(--space-2xl);
+}
+
+.child-task-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.child-task-item {
+  padding: var(--space-md);
+}
+
+.child-task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.child-task-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.child-task-title:hover {
+  color: var(--color-accent);
 }
 
 @media (max-width: 640px) {
