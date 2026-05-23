@@ -461,7 +461,9 @@ onUnmounted(() => {
             :class="['chat-message', msg.role]"
           >
             <div class="chat-bubble">
-              <div v-if="msg.role === 'user'" class="chat-text">{{ msg.content }}</div>
+              <div v-if="msg.role === 'user'" class="chat-text">
+                <pre>{{ msg.content }}</pre>
+              </div>
               <div v-else>
                 <div v-if="msg.status === 'streaming'" class="chat-streaming">
                   <div
