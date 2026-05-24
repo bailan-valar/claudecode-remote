@@ -111,13 +111,37 @@ app.whenReady().then(async () => {
     console.error('[main] failed to start web server:', err.message)
   }
 
+  // 检查重启状态
+  const { getRestartManager } = await import('./utils/restartManager')
+  const restartManager = getRestartManager()
+
+  const lastRestartState = restartManager.getLastRestartState()
+  if (lastRestartState) {
+    console.log('[main] Last restart state:', lastRestartState)
+    broadcast('system:restarted', {
+      reason: lastRestartState.reason,
+      timestamp: lastRestartState.timestamp,
+      taskIds: lastRestartState.taskIds
+    })
+    restartManager.clearRestartState()
+  }
+
   // 启动任务引擎（若用户已登录且上次未手动停止）
   const db = syncManager.getLocalDb()
   if (db) {
     const state = loadEngineState()
     engine = new TaskEngine({ db, concurrency: state.concurrency ?? 1, provider: state.provider })
     engine.on('status', (status) => broadcast('engine:status', status))
-    engine.on('task:completed', (taskId, result) => broadcast('engine:task:completed', taskId, result))
+    engine.on('task:completed', (taskId, result) => {
+      broadcast('engine:task:completed', taskId, result)
+      // 任务完成后触发重启逻辑
+      console.log(`[main] Task ${taskId} completed, considering restart...`)
+
+      // 检查任务结果，根据决定是否重启
+      if (result.success) {
+        restartManager.scheduleRestart(`Task ${taskId} completed successfully`, [taskId])
+      }
+    })
     engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
     setEngine(engine)
     if (state.running) {

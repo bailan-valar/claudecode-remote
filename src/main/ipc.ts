@@ -140,4 +140,42 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('terminal:execute', async (_, projectId: string, command: string, workingDir?: string) => {
     return api.executeTerminalCommandAction(projectId, command, workingDir)
   })
+
+  // --- System restart handlers ---
+  ipcMain.removeHandler('system:restart')
+  ipcMain.handle('system:restart', async (_, options: { reason: string; delay?: number }) => {
+    const { getRestartManager } = await import('./utils/restartManager')
+    const manager = getRestartManager()
+
+    if (options.delay) {
+      setTimeout(() => {
+        manager.immediateRestart(options.reason)
+      }, options.delay)
+    } else {
+      await manager.immediateRestart(options.reason)
+    }
+
+    return { ok: true }
+  })
+
+  ipcMain.removeHandler('system:restart:cancel')
+  ipcMain.handle('system:restart:cancel', async () => {
+    const { getRestartManager } = await import('./utils/restartManager')
+    const manager = getRestartManager()
+    manager.cancelRestart()
+
+    return { ok: true }
+  })
+
+  ipcMain.removeHandler('system:restart:status')
+  ipcMain.handle('system:restart:status', async () => {
+    const { getRestartManager } = await import('./utils/restartManager')
+    const manager = getRestartManager()
+
+    return {
+      ok: true,
+      isPendingRestart: manager.isPendingRestart(),
+      lastRestartState: manager.getLastRestartState()
+    }
+  })
 }
