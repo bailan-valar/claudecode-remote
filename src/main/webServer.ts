@@ -112,6 +112,8 @@ mainEvents.on('engine:task:completed', (taskId, result) => broadcastToSse('engin
 mainEvents.on('engine:task:failed', (taskId, error) => broadcastToSse('engine:task:failed', taskId, error))
 mainEvents.on('claude:chat:log', (entry: LogEntry) => broadcastToSse('claude:chat:log', entry))
 mainEvents.on('claude:chat:done', (result: any) => broadcastToSse('claude:chat:done', result))
+mainEvents.on('system:restart-imminent', (data) => broadcastToSse('system:restart-imminent', data))
+mainEvents.on('system:restarted', (data) => broadcastToSse('system:restarted', data))
 
 export function startWebServer(): void {
   const server = createServer(async (req, res) => {
@@ -313,6 +315,44 @@ export function startWebServer(): void {
           const { syncManager } = await import('./index')
           syncManager.restart()
           sendJson(res, 200, { ok: true })
+          return
+        }
+
+        // System Restart
+        if (pathname === '/api/system/restart' && req.method === 'POST') {
+          const { getRestartManager } = await import('./utils/restartManager')
+          const manager = getRestartManager()
+
+          if (body.delay) {
+            setTimeout(() => {
+              manager.immediateRestart(body.reason || 'manual_api')
+            }, body.delay)
+          } else {
+            await manager.immediateRestart(body.reason || 'manual_api')
+          }
+
+          sendJson(res, 200, { ok: true })
+          return
+        }
+
+        if (pathname === '/api/system/restart/cancel' && req.method === 'POST') {
+          const { getRestartManager } = await import('./utils/restartManager')
+          const manager = getRestartManager()
+          manager.cancelRestart()
+
+          sendJson(res, 200, { ok: true })
+          return
+        }
+
+        if (pathname === '/api/system/restart/status' && req.method === 'GET') {
+          const { getRestartManager } = await import('./utils/restartManager')
+          const manager = getRestartManager()
+
+          sendJson(res, 200, {
+            ok: true,
+            isPendingRestart: manager.isPendingRestart(),
+            lastRestartState: manager.getLastRestartState()
+          })
           return
         }
 
