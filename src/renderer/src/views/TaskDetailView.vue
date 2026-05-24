@@ -91,11 +91,11 @@ const parentTask = computed(() => {
   return taskStore.tasks.find((t) => t._id === task.value!.parentTaskId)
 })
 
-// 执行阶段列表
+// 执行阶段列表（倒序排列，最新的在最上面）
 const executionPhases = computed(() => {
   if (!task.value) return []
   if (task.value.statusHistory && task.value.statusHistory.length > 0) {
-    return task.value.statusHistory
+    return [...task.value.statusHistory].reverse()
   }
   // 兼容旧数据：基于 timeEntries
   const phases: StatusHistoryEntry[] = []
@@ -115,7 +115,7 @@ const executionPhases = computed(() => {
       startedAt: task.value.updatedAt || task.value.createdAt,
     })
   }
-  return phases
+  return phases.reverse()
 })
 
 const selectedPhase = computed(() => executionPhases.value[selectedPhaseIndex.value])
