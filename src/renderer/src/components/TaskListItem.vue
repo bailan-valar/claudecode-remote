@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Task } from '../../../shared/types'
 import type { TaskStatus } from '../../../shared/constants'
 import { KIND_LABEL } from '../../../shared/constants'
@@ -16,11 +16,36 @@ interface Props {
   tick?: number
   draggable?: boolean
   showPriority?: boolean
+  forceDropdown?: boolean // 强制使用下拉菜单
 }
 
 const props = withDefaults(defineProps<Props>(), {
   mode: 'list',
   showPriority: false,
+  forceDropdown: false,
+})
+
+// 响应式的移动端检测
+const isMobile = ref(false)
+
+// 检测是否为移动端
+function checkMobile() {
+  isMobile.value = typeof window !== 'undefined' && window.innerWidth < 640
+}
+
+// 判断是否应该使用下拉菜单
+const shouldUseDropdown = computed(() => {
+  // 强制使用下拉菜单
+  if (props.forceDropdown) return true
+
+  // 紧凑模式和看板模式始终使用下拉菜单
+  if (props.mode === 'compact' || props.mode === 'kanban') return true
+
+  // 移动端使用下拉菜单
+  if (isMobile.value) return true
+
+  // 桌面端列表模式直接显示按钮
+  return false
 })
 
 // 下拉菜单状态
@@ -51,10 +76,13 @@ function handleClickOutside(e: Event) {
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('resize', checkMobile)
+  checkMobile() // 初始检测
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('resize', checkMobile)
 })
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -98,15 +126,6 @@ function onDragEnd(e: DragEvent) {
   }
   emit('dragend', e)
 }
-
-// 生命周期钩子
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
 </script>
 
 <template>
@@ -158,7 +177,8 @@ onUnmounted(() => {
     <div class="actions">
       <TaskStatusActions :status="task.status" @transition="emit('transition', $event)" />
       <div class="action-buttons">
-        <div class="dropdown" :class="{ 'dropdown-active': showDropdown }" ref="dropdownRef">
+        <!-- 下拉菜单模式 -->
+        <div v-if="shouldUseDropdown" class="dropdown" :class="{ 'dropdown-active': showDropdown }" ref="dropdownRef">
           <button class="glass-button btn-more" @click="toggleDropdown">
             <span class="more-icon">•••</span>
           </button>
@@ -173,6 +193,12 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
+
+        <!-- 直接显示按钮模式 -->
+        <template v-else>
+          <button class="glass-button btn-edit" @click="emit('edit', task._id)">编辑</button>
+          <button class="glass-button danger btn-delete" @click="emit('delete', task._id)">删除</button>
+        </template>
       </div>
     </div>
   </li>
@@ -457,6 +483,31 @@ onUnmounted(() => {
 .task-list-item .actions .glass-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.task-list-item .btn-edit {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text);
+}
+
+.task-list-item .btn-edit:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.task-list-item .btn-delete {
+  background: rgba(255, 59, 48, 0.05);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  color: var(--color-error);
+}
+
+.task-list-item .btn-delete:hover {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: var(--color-error);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.15);
 }
 
 /* 下拉菜单样式 */
