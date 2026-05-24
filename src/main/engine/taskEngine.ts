@@ -558,6 +558,8 @@ export class TaskEngine extends EventEmitter {
     try {
       const taskRepo = createTaskRepository(this.db)
       await taskRepo.update(taskId, { logs })
+      // 发射日志更新事件，通知前端
+      this.emit('task:logs_updated', taskId, logs)
     } catch (err) {
       console.error('[engine] flush logs failed:', err)
     }

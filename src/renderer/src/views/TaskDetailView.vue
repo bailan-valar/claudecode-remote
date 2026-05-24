@@ -3,6 +3,7 @@ import { onMounted, ref, watch, onUnmounted, computed, defineOptions, nextTick }
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
+import { apiClient } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import TaskStatusActions from '../components/TaskStatusActions.vue'
 import TaskListItem from '../components/TaskListItem.vue'
@@ -41,6 +42,9 @@ const logListRef = ref<HTMLElement | null>(null)
 
 // 定时刷新任务数据的定时器
 let refreshTimerId: ReturnType<typeof setInterval> | null = null
+
+// SSE事件监听器取消函数
+let unsubscribeLogsUpdated: (() => void) | null = null
 
 // 控制是否隐藏工具调用（从本地存储读取偏好）
 const hideToolCalls = ref(localStorage.getItem('hideToolCalls') === 'true')
@@ -198,6 +202,10 @@ onUnmounted(() => {
     clearInterval(refreshTimerId)
     refreshTimerId = null
   }
+  if (unsubscribeLogsUpdated) {
+    unsubscribeLogsUpdated()
+    unsubscribeLogsUpdated = null
+  }
 })
 
 onMounted(() => {
@@ -227,6 +235,14 @@ onMounted(() => {
   // 监听任务状态变化，调整刷新频率
   watch(() => task.value?.status, () => {
     startRefreshTimer()
+  })
+
+  // 监听SSE日志更新事件
+  unsubscribeLogsUpdated = apiClient.onEngineTaskLogsUpdated((updatedTaskId: string) => {
+    // 如果是当前任务，立即刷新数据
+    if (updatedTaskId === taskId) {
+      taskStore.fetch()
+    }
   })
 })
 

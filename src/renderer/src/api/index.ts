@@ -45,6 +45,11 @@ function ensureSse(): EventSource {
       const args = Array.isArray(payload) ? payload : [payload]
       sseListeners.get('engine:task:failed')?.forEach((cb) => cb(...args))
     })
+    sseSource.addEventListener('engine:task:logs_updated', (e) => {
+      const payload = JSON.parse((e as MessageEvent).data)
+      const args = Array.isArray(payload) ? payload : [payload]
+      sseListeners.get('engine:task:logs_updated')?.forEach((cb) => cb(...args))
+    })
   }
   return sseSource
 }
@@ -102,6 +107,7 @@ const httpApi: Api = {
   onEngineStatus: (cb) => registerSseListener('engine:status', cb),
   onEngineTaskCompleted: (cb) => registerSseListener('engine:task:completed', cb),
   onEngineTaskFailed: (cb) => registerSseListener('engine:task:failed', cb),
+  onEngineTaskLogsUpdated: (cb) => registerSseListener('engine:task:logs_updated', cb),
 
   selectDirectory: () => Promise.resolve({ ok: false, error: '浏览器不支持系统目录选择' }),
 

@@ -143,6 +143,7 @@ app.whenReady().then(async () => {
       }
     })
     engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
+    engine.on('task:logs_updated', (taskId, logs) => broadcast('engine:task:logs_updated', taskId, logs))
     setEngine(engine)
     if (state.running) {
       engine.start()

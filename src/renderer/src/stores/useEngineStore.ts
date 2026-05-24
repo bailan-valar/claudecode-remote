@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { apiClient } from '../api'
+import { useTaskStore } from './useTaskStore'
 
 export interface EngineStatus {
   running: boolean
@@ -26,6 +27,7 @@ export const useEngineStore = defineStore('engine', () => {
   let unsubStatus: (() => void) | null = null
   let unsubCompleted: (() => void) | null = null
   let unsubFailed: (() => void) | null = null
+  let unsubLogsUpdated: (() => void) | null = null
 
   async function fetchStatus() {
     const result = await apiClient.getEngineStatus()
@@ -87,14 +89,24 @@ export const useEngineStore = defineStore('engine', () => {
   }
 
   function listen() {
+    const taskStore = useTaskStore()
     unsubStatus = apiClient.onEngineStatus((s: EngineStatus) => {
       status.value = s
     })
     unsubCompleted = apiClient.onEngineTaskCompleted((taskId: string) => {
       console.log('[engine] task completed:', taskId)
+      // 自动刷新任务列表
+      taskStore.fetch()
     })
     unsubFailed = apiClient.onEngineTaskFailed((taskId: string, error: string) => {
       console.error('[engine] task failed:', taskId, error)
+      // 自动刷新任务列表
+      taskStore.fetch()
+    })
+    unsubLogsUpdated = apiClient.onEngineTaskLogsUpdated((taskId: string, logs: any[]) => {
+      console.log('[engine] task logs updated:', taskId, 'logs count:', logs.length)
+      // 自动刷新任务列表，获取最新的日志和阶段历史
+      taskStore.fetch()
     })
   }
 
@@ -102,9 +114,11 @@ export const useEngineStore = defineStore('engine', () => {
     unsubStatus?.()
     unsubCompleted?.()
     unsubFailed?.()
+    unsubLogsUpdated?.()
     unsubStatus = null
     unsubCompleted = null
     unsubFailed = null
+    unsubLogsUpdated = null
   }
 
   onMounted(() => {

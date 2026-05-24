@@ -68,6 +68,11 @@ const api = {
     ipcRenderer.on('engine:task:failed', listener)
     return () => { ipcRenderer.off('engine:task:failed', listener) }
   },
+  onEngineTaskLogsUpdated: (cb: (taskId: string, logs: any[]) => void): (() => void) => {
+    const listener = (_: unknown, taskId: string, logs: any[]) => cb(taskId, logs)
+    ipcRenderer.on('engine:task:logs_updated', listener)
+    return () => { ipcRenderer.off('engine:task:logs_updated', listener) }
+  },
 
   // === Claude Chat ===
   chatWithClaude: (projectId: string, message: string, sessionId?: string) =>
