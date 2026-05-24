@@ -40,7 +40,7 @@ const selectedPhaseIndex = ref(0)
 // 日志列表引用
 const logListRef = ref<HTMLElement | null>(null)
 
-// 定时刷新任务数据的定时器
+// 定时刷新任务数据的定时器（已由全局SSE事件替代，保留作为备份）
 let refreshTimerId: ReturnType<typeof setInterval> | null = null
 
 // SSE事件监听器取消函数
@@ -213,31 +213,12 @@ onMounted(() => {
   if (!task.value) taskStore.fetch()
   projectStore.fetch()
 
-  // 启动定时刷新：根据任务状态智能调整刷新频率
-  const startRefreshTimer = () => {
-    if (refreshTimerId) {
-      clearInterval(refreshTimerId)
-    }
+  // 启动轻量级定时刷新：仅作为SSE机制的备份（30秒间隔）
+  refreshTimerId = setInterval(() => {
+    taskStore.fetch()
+  }, 30000)
 
-    // 如果任务正在执行中（planning/developing），频繁刷新
-    const isTaskRunning = task.value?.status === TASK_STATUS.PLANNING ||
-                         task.value?.status === TASK_STATUS.DEVELOPING
-
-    const interval = isTaskRunning ? 2000 : 10000 // 执行中2秒，否则10秒
-
-    refreshTimerId = setInterval(() => {
-      taskStore.fetch()
-    }, interval)
-  }
-
-  startRefreshTimer()
-
-  // 监听任务状态变化，调整刷新频率
-  watch(() => task.value?.status, () => {
-    startRefreshTimer()
-  })
-
-  // 监听SSE日志更新事件
+  // 监听SSE日志更新事件（主要更新机制）
   unsubscribeLogsUpdated = apiClient.onEngineTaskLogsUpdated((updatedTaskId: string) => {
     // 如果是当前任务，立即刷新数据
     if (updatedTaskId === taskId) {

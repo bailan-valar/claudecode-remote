@@ -20,7 +20,7 @@ onMounted(() => {
   projectStore.fetch()
   taskStore.fetch()
   engineStore.fetchStatus()
-  engineStore.listen()
+  // engineStore.listen() 已在 App.vue 中全局调用，这里不需要重复调用
 })
 
 function dotClass(phase: string): string {

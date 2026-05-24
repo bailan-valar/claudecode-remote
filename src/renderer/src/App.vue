@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
 import { useAuthStore } from './stores/useAuthStore'
+import { useEngineStore } from './stores/useEngineStore'
 import { useRoute } from 'vue-router'
 import { getGlobalKeepAliveManager } from './utils/keepAliveManager'
 
 const auth = useAuthStore()
+const engineStore = useEngineStore() // 确保引擎store全局初始化
 const route = useRoute()
 const isMobile = ref(false)
 
@@ -22,6 +24,20 @@ onMounted(() => {
 
   // 启动自动缓存管理
   keepAliveManager.autoManageCache()
+
+  // 启动引擎状态监听（SSE连接）
+  engineStore.listen()
+})
+
+// 监听用户登录状态，在用户登出时停止引擎监听
+watch(() => auth.currentUser, (currentUser) => {
+  if (!currentUser) {
+    // 用户登出时停止监听
+    engineStore.unlisten()
+  } else {
+    // 用户登录时重新启动监听
+    engineStore.listen()
+  }
 })
 
 // 监听路由变化，动态更新缓存
