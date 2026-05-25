@@ -12,9 +12,12 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
-    "dev": "electron-vite dev",
+    "dev": "cross-env WEB_PORT=3457 electron-vite dev",
+    "dev:hmr": "cross-env NODE_ENV=development WEB_PORT=3457 VITE_DEV_SERVER_URL=http://localhost:3456/ electron-vite dev",
     "dev:watch": "node restart-manager.js",
     "dev:auto": "npm run dev",
+    "test:hmr": "node test-hmr.js",
+    "test:restart": "node test-restart.js",
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
@@ -33,6 +36,7 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "@types/node": "^22.15.3",
     "@types/pouchdb": "^6.4.2",
     "@vitejs/plugin-vue": "^5.2.3",

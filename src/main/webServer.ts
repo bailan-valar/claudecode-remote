@@ -115,6 +115,11 @@ mainEvents.on('claude:chat:log', (entry: LogEntry) => broadcastToSse('claude:cha
 mainEvents.on('claude:chat:done', (result: any) => broadcastToSse('claude:chat:done', result))
 mainEvents.on('system:restart-imminent', (data) => broadcastToSse('system:restart-imminent', data))
 mainEvents.on('system:restarted', (data) => broadcastToSse('system:restarted', data))
+mainEvents.on('hmr:status', (data) => broadcastToSse('hmr:status', data))
+mainEvents.on('hmr:file-changed', (data) => broadcastToSse('hmr:file-changed', data))
+mainEvents.on('hmr:notification', (data) => broadcastToSse('hmr:notification', data))
+mainEvents.on('hmr:project-changed', (data) => broadcastToSse('hmr:project-changed', data))
+mainEvents.on('notification:show', (data) => broadcastToSse('notification:show', data))
 
 export function startWebServer(): void {
   const server = createServer(async (req, res) => {
@@ -354,6 +359,53 @@ export function startWebServer(): void {
             isPendingRestart: manager.isPendingRestart(),
             lastRestartState: manager.getLastRestartState()
           })
+          return
+        }
+
+        // HMR Management
+        if (pathname === '/api/hmr/status' && req.method === 'GET') {
+          const { getHMRManager } = await import('./utils/hmrManager')
+          const hmrManager = getHMRManager()
+
+          sendJson(res, 200, {
+            ok: true,
+            stats: hmrManager.getStats(),
+            config: hmrManager.getConfig(),
+            isRunning: hmrManager.isEnabled()
+          })
+          return
+        }
+
+        if (pathname === '/api/hmr/reload' && req.method === 'POST') {
+          const type = body.type || 'renderer'
+          const { getHMRManager } = await import('./utils/hmrManager')
+          await getHMRManager().manualReload(type)
+
+          sendJson(res, 200, { ok: true, message: `Reload triggered for ${type}` })
+          return
+        }
+
+        if (pathname === '/api/hmr/start' && req.method === 'POST') {
+          const { getHMRManager } = await import('./utils/hmrManager')
+          const hmrManager = getHMRManager()
+
+          if (!hmrManager.isEnabled()) {
+            hmrManager.start()
+          }
+
+          sendJson(res, 200, { ok: true, enabled: hmrManager.isEnabled() })
+          return
+        }
+
+        if (pathname === '/api/hmr/stop' && req.method === 'POST') {
+          const { getHMRManager } = await import('./utils/hmrManager')
+          const hmrManager = getHMRManager()
+
+          if (hmrManager.isEnabled()) {
+            hmrManager.stop()
+          }
+
+          sendJson(res, 200, { ok: true })
           return
         }
 

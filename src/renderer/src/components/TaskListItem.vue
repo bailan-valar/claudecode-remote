@@ -4,8 +4,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Task } from '../../../shared/types'
 import type { TaskStatus } from '../../../shared/constants'
 import { KIND_LABEL } from '../../../shared/constants'
+import { getAllowedNext } from '../utils/taskTransitions'
 import StatusBadge from './StatusBadge.vue'
 import TaskStatusActions from './TaskStatusActions.vue'
+import TaskItemDropdown from './TaskItemDropdown.vue'
 import { formatDurationShort } from '../utils/formatDuration'
 import { calculateLiveDuration, isTracking } from '../utils/timeTracking'
 
@@ -17,12 +19,18 @@ interface Props {
   draggable?: boolean
   showPriority?: boolean
   forceDropdown?: boolean // 强制使用下拉菜单
+  depth?: number // 树形缩进层级
+  hasChildren?: boolean // 是否有子任务
+  isExpanded?: boolean // 是否已展开
 }
 
 const props = withDefaults(defineProps<Props>(), {
   mode: 'list',
   showPriority: false,
   forceDropdown: false,
+  depth: 0,
+  hasChildren: false,
+  isExpanded: false,
 })
 
 // 响应式的移动端检测
@@ -51,15 +59,34 @@ const shouldUseDropdown = computed(() => {
 // 下拉菜单状态
 const showDropdown = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const showStatusSubmenu = ref(false)
+const dropdownStyle = ref({ top: '0px', right: '0px' })
+
+const nextStates = computed(() => getAllowedNext(props.task.status, props.task))
+
+function updateDropdownPosition() {
+  const btn = dropdownRef.value
+  if (!btn) return
+  const rect = btn.getBoundingClientRect()
+  dropdownStyle.value = {
+    top: `${rect.bottom + 4}px`,
+    right: `${window.innerWidth - rect.right}px`,
+  }
+}
 
 function toggleDropdown(e: Event) {
   e.preventDefault()
   e.stopPropagation()
   showDropdown.value = !showDropdown.value
+  showStatusSubmenu.value = false
+  if (showDropdown.value) {
+    updateDropdownPosition()
+  }
 }
 
 function closeDropdown() {
   showDropdown.value = false
+  showStatusSubmenu.value = false
 }
 
 // 点击下拉菜单内部时不关闭
@@ -104,6 +131,8 @@ const emit = defineEmits<{
   delete: [taskId: string]
   dragstart: [e: DragEvent, taskId: string]
   dragend: [e: DragEvent]
+  toggle: [taskId: string]
+  addSubtask: [taskId: string]
 }>()
 
 function duration() {
@@ -137,6 +166,16 @@ function onDragEnd(e: DragEvent) {
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
+    <div class="tree-indent" :style="{ width: `${depth * 20}px` }"></div>
+    <button
+      v-if="hasChildren"
+      class="tree-toggle"
+      @click.stop="emit('toggle', task._id)"
+      title="展开/折叠子任务"
+    >
+      <span class="tree-toggle-icon">{{ isExpanded ? '▼' : '▶' }}</span>
+    </button>
+    <span v-else-if="depth > 0" class="tree-leaf-spacer"></span>
     <div class="task-main">
       <RouterLink
         :to="{ name: 'task-detail', params: { id: task._id } }"
@@ -182,16 +221,19 @@ function onDragEnd(e: DragEvent) {
           <button class="glass-button btn-more" @click="toggleDropdown">
             <span class="more-icon">•••</span>
           </button>
-          <div class="dropdown-menu" v-show="showDropdown" @click.stop>
-            <button class="dropdown-item" @click="emit('edit', task._id); closeDropdown()">
-              <span class="dropdown-icon">✏️</span>
-              编辑
-            </button>
-            <button class="dropdown-item danger" @click="emit('delete', task._id); closeDropdown()">
-              <span class="dropdown-icon">🗑️</span>
-              删除
-            </button>
-          </div>
+          <TaskItemDropdown
+            :task="task"
+            :show-dropdown="showDropdown"
+            :show-status-submenu="showStatusSubmenu"
+            :next-states="nextStates"
+            :dropdown-style="dropdownStyle"
+            @edit="emit('edit', $event); closeDropdown()"
+            @transition="emit('transition', $event); closeDropdown()"
+            @add-subtask="emit('addSubtask', $event); closeDropdown()"
+            @delete="emit('delete', $event); closeDropdown()"
+            @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+            @close="closeDropdown()"
+          />
         </div>
 
         <!-- 直接显示按钮模式 -->
@@ -239,16 +281,19 @@ function onDragEnd(e: DragEvent) {
         <button class="glass-button btn-more" @click="toggleDropdown">
           <span class="more-icon">•••</span>
         </button>
-        <div class="dropdown-menu" v-show="showDropdown" @click.stop>
-          <button class="dropdown-item" @click="emit('edit', task._id); closeDropdown()">
-            <span class="dropdown-icon">✏️</span>
-            编辑
-          </button>
-          <button class="dropdown-item danger" @click="emit('delete', task._id); closeDropdown()">
-            <span class="dropdown-icon">🗑️</span>
-            删除
-          </button>
-        </div>
+        <TaskItemDropdown
+          :task="task"
+          :show-dropdown="showDropdown"
+          :show-status-submenu="showStatusSubmenu"
+          :next-states="nextStates"
+          :dropdown-style="dropdownStyle"
+          @edit="emit('edit', $event); closeDropdown()"
+          @transition="emit('transition', $event); closeDropdown()"
+          @add-subtask="emit('addSubtask', $event); closeDropdown()"
+          @delete="emit('delete', $event); closeDropdown()"
+          @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+          @close="closeDropdown()"
+        />
       </div>
     </div>
   </div>
@@ -261,6 +306,16 @@ function onDragEnd(e: DragEvent) {
     @dragstart="onDragStart"
     @dragend="onDragEnd"
   >
+    <div class="tree-indent" :style="{ width: `${depth * 16}px` }"></div>
+    <button
+      v-if="hasChildren"
+      class="tree-toggle compact-toggle"
+      @click.stop="emit('toggle', task._id)"
+      title="展开/折叠子任务"
+    >
+      <span class="tree-toggle-icon">{{ isExpanded ? '▼' : '▶' }}</span>
+    </button>
+    <span v-else-if="depth > 0" class="tree-leaf-spacer compact-spacer"></span>
     <div class="compact-main">
       <RouterLink
         :to="{ name: 'task-detail', params: { id: task._id } }"
@@ -288,22 +343,73 @@ function onDragEnd(e: DragEvent) {
         <button class="glass-button btn-icon btn-more" @click="toggleDropdown">
           <span class="more-icon">•••</span>
         </button>
-        <div class="dropdown-menu dropdown-menu-compact" v-show="showDropdown" @click.stop>
-          <button class="dropdown-item" @click="emit('edit', task._id); closeDropdown()">
-            <span class="dropdown-icon">✏️</span>
-            编辑
-          </button>
-          <button class="dropdown-item danger" @click="emit('delete', task._id); closeDropdown()">
-            <span class="dropdown-icon">🗑️</span>
-            删除
-          </button>
-        </div>
+        <TaskItemDropdown
+          :task="task"
+          :show-dropdown="showDropdown"
+          :show-status-submenu="showStatusSubmenu"
+          :next-states="nextStates"
+          :dropdown-style="dropdownStyle"
+          compact
+          @edit="emit('edit', $event); closeDropdown()"
+          @transition="emit('transition', $event); closeDropdown()"
+          @add-subtask="emit('addSubtask', $event); closeDropdown()"
+          @delete="emit('delete', $event); closeDropdown()"
+          @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+          @close="closeDropdown()"
+        />
       </div>
     </div>
   </li>
 </template>
 
 <style scoped>
+/* Tree controls */
+.tree-indent {
+  flex-shrink: 0;
+}
+
+.tree-toggle {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: 0;
+  margin-top: 2px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.tree-toggle:hover {
+  color: var(--color-accent);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.tree-toggle-icon {
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.tree-leaf-spacer {
+  flex-shrink: 0;
+  width: 20px;
+}
+
+.tree-leaf-spacer.compact-spacer {
+  width: 22px;
+}
+
+.tree-toggle.compact-toggle {
+  width: 22px;
+  height: 22px;
+  margin-top: 0;
+}
+
 /* List mode - 更紧凑的设计 */
 .task-list-item {
   padding: var(--space-md) var(--space-lg);
@@ -537,67 +643,6 @@ function onDragEnd(e: DragEvent) {
   line-height: 1;
 }
 
-.task-list-item .dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  min-width: 120px;
-  z-index: 100;
-  overflow: hidden;
-  animation: dropdownFadeIn 0.15s ease-out;
-}
-
-@keyframes dropdownFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.task-list-item .dropdown-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 0.875rem;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  white-space: nowrap;
-}
-
-.task-list-item .dropdown-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.task-list-item .dropdown-item.danger {
-  color: var(--color-error);
-}
-
-.task-list-item .dropdown-item.danger:hover {
-  background: rgba(255, 59, 48, 0.1);
-}
-
-.task-list-item .dropdown-icon {
-  font-size: 0.875rem;
-  line-height: 1;
-}
-
 /* Kanban mode */
 .task-kanban-item {
   padding: var(--space-sm);
@@ -739,66 +784,17 @@ function onDragEnd(e: DragEvent) {
   letter-spacing: 1px;
 }
 
-.task-kanban-item .dropdown-menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  min-width: 100px;
-  z-index: 100;
-  overflow: hidden;
-  animation: dropdownFadeIn 0.15s ease-out;
-}
-
-.task-kanban-item .dropdown-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 0.75rem;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  white-space: nowrap;
-}
-
-.task-kanban-item .dropdown-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.task-kanban-item .dropdown-item.danger {
-  color: var(--color-error);
-}
-
-.task-kanban-item .dropdown-item.danger:hover {
-  background: rgba(255, 59, 48, 0.1);
-}
-
-.task-kanban-item .dropdown-icon {
-  font-size: 0.75rem;
-}
-
-/* Compact mode - 重新设计为超紧凑布局 */
+/* Compact mode - 紧凑但可读 */
 .task-compact-item {
-  padding: 2px 4px;
+  padding: 6px 10px;
   list-style: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 2px;
+  gap: 6px;
   transition: background-color var(--transition-fast), transform var(--transition-fast);
-  border-radius: 0;
-  min-height: 24px;
+  border-radius: var(--radius-sm);
+  min-height: 40px;
   border-bottom: 1px solid var(--glass-border-subtle);
   background-color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
@@ -823,21 +819,19 @@ function onDragEnd(e: DragEvent) {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
 }
 
 .task-compact-item .compact-title {
   font-weight: 500;
-  font-size: 0.625rem;
+  font-size: 0.875rem;
   color: var(--color-text);
   text-decoration: none;
   transition: color var(--transition-fast);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.3;
 }
 
 .task-compact-item .compact-title:hover {
@@ -847,25 +841,23 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 4px;
   flex-wrap: nowrap;
-  font-size: 0.5rem;
+  font-size: 0.75rem;
   color: var(--color-text-secondary);
   overflow: hidden;
   flex-shrink: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 .task-compact-item .compact-meta .kind {
   font-weight: 500;
   background: rgba(0, 0, 0, 0.02);
-  padding: 1px 2px;
+  padding: 2px 6px;
   border-radius: var(--radius-full);
   border: 1px solid var(--glass-border-subtle);
   transition: all var(--transition-fast);
   white-space: nowrap;
-  font-size: 0.5rem;
+  font-size: 0.6875rem;
 }
 
 .task-compact-item .compact-meta .kind:hover {
@@ -875,19 +867,19 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta .project {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 50px;
-  font-size: 0.5rem;
+  max-width: 80px;
+  font-size: 0.75rem;
 }
 
 .task-compact-item .compact-meta .project::before {
   content: '';
   display: inline-block;
-  width: 1.5px;
-  height: 1.5px;
+  width: 3px;
+  height: 3px;
   background: currentColor;
   border-radius: 50%;
   opacity: 0.5;
@@ -897,11 +889,11 @@ function onDragEnd(e: DragEvent) {
 .task-compact-item .compact-meta .duration {
   font-family: 'SF Mono', Monaco, monospace;
   background: rgba(0, 0, 0, 0.02);
-  padding: 1px 2px;
+  padding: 2px 6px;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
   white-space: nowrap;
-  font-size: 0.5rem;
+  font-size: 0.75rem;
 }
 
 .task-compact-item .compact-meta .duration:hover {
@@ -916,17 +908,17 @@ function onDragEnd(e: DragEvent) {
 
 .task-compact-item .compact-actions {
   display: flex;
-  gap: 1px;
+  gap: 4px;
   flex-shrink: 0;
   align-items: center;
 }
 
 .task-compact-item .compact-actions .btn-icon {
-  font-size: 0.75rem;
-  padding: 2px;
-  min-height: 18px;
-  min-width: 18px;
-  max-width: 18px;
+  font-size: 0.875rem;
+  padding: 4px;
+  min-height: 26px;
+  min-width: 26px;
+  max-width: 26px;
   transition: all var(--transition-fast);
   display: flex;
   align-items: center;
@@ -954,7 +946,7 @@ function onDragEnd(e: DragEvent) {
 }
 
 .task-compact-item .compact-actions .btn-icon span {
-  font-size: 0.5625rem;
+  font-size: 0.75rem;
   line-height: 1;
 }
 
@@ -969,10 +961,10 @@ function onDragEnd(e: DragEvent) {
 }
 
 .task-compact-item .btn-more {
-  min-height: 16px;
-  min-width: 16px;
-  max-width: 16px;
-  padding: 1px;
+  min-height: 22px;
+  min-width: 22px;
+  max-width: 22px;
+  padding: 3px;
   font-size: 0.75rem;
   display: flex;
   align-items: center;
@@ -980,59 +972,10 @@ function onDragEnd(e: DragEvent) {
 }
 
 .task-compact-item .more-icon {
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-weight: bold;
   letter-spacing: 0.5px;
   line-height: 1;
-}
-
-.task-compact-item .dropdown-menu-compact {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 2px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px) saturate(1.6);
-  -webkit-backdrop-filter: blur(16px) saturate(1.6);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  min-width: 80px;
-  z-index: 100;
-  overflow: hidden;
-  animation: dropdownFadeIn 0.1s ease-out;
-}
-
-.task-compact-item .dropdown-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 4px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  font-size: 0.625rem;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  white-space: nowrap;
-}
-
-.task-compact-item .dropdown-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.task-compact-item .dropdown-item.danger {
-  color: var(--color-error);
-}
-
-.task-compact-item .dropdown-item.danger:hover {
-  background: rgba(255, 59, 48, 0.1);
-}
-
-.task-compact-item .dropdown-icon {
-  font-size: 0.5625rem;
 }
 
 @keyframes pulse {
@@ -1116,16 +1059,6 @@ function onDragEnd(e: DragEvent) {
     min-height: 36px;
   }
 
-  /* 移动端下拉菜单优化 */
-  .task-list-item .dropdown-menu {
-    min-width: 140px;
-  }
-
-  .task-list-item .dropdown-item {
-    padding: var(--space-sm) var(--space-md);
-    font-size: 0.9375rem;
-  }
-
   .task-list-item .btn-more {
     min-height: 36px;
     padding: var(--space-sm) var(--space-md);
@@ -1143,69 +1076,55 @@ function onDragEnd(e: DragEvent) {
 
   /* 优化移动端的紧凑模式 */
   .task-compact-item {
-    padding: 3px 4px;
-    min-height: 26px;
-    gap: 3px;
+    padding: 5px 8px;
+    min-height: 36px;
+    gap: 5px;
   }
 
   .task-compact-item .compact-main {
     flex: 1;
-    gap: 1px;
+    gap: 4px;
     min-width: 0;
   }
 
   .task-compact-item .compact-title {
-    font-size: 0.625rem;
-    line-height: 1;
+    font-size: 0.8125rem;
+    line-height: 1.3;
   }
 
   .task-compact-item .compact-meta {
-    font-size: 0.5rem;
-    gap: 1px;
+    font-size: 0.6875rem;
+    gap: 3px;
   }
 
   .task-compact-item .compact-meta .kind {
-    font-size: 0.475rem;
-    padding: 1px 2px;
+    font-size: 0.625rem;
+    padding: 2px 5px;
   }
 
   .task-compact-item .compact-meta .project {
-    font-size: 0.475rem;
-    max-width: 40px;
+    font-size: 0.6875rem;
+    max-width: 60px;
   }
 
   .task-compact-item .compact-meta .duration {
-    font-size: 0.475rem;
-    padding: 1px 2px;
+    font-size: 0.6875rem;
+    padding: 2px 5px;
   }
 
   .task-compact-item .compact-actions {
-    gap: 1px;
+    gap: 3px;
   }
 
   .task-compact-item .compact-actions .btn-icon {
-    min-height: 20px;
-    min-width: 20px;
-    max-width: 20px;
-    padding: 2px;
+    min-height: 24px;
+    min-width: 24px;
+    max-width: 24px;
+    padding: 3px;
   }
 
   .task-compact-item .compact-actions .btn-icon span {
-    font-size: 0.5625rem;
-  }
-
-  /* 移动端紧凑模式下拉菜单优化 */
-  .task-compact-item .dropdown-menu-compact {
-    min-width: 90px;
-  }
-
-  .task-compact-item .dropdown-item {
-    padding: 3px 6px;
-    font-size: 0.625rem;
-  }
-
-  .task-compact-item .dropdown-icon {
-    font-size: 0.625rem;
+    font-size: 0.6875rem;
   }
 
   .task-compact-item .more-icon {

@@ -106,29 +106,35 @@ export function useKeepAliveManager(): KeepAliveManager {
    */
   const autoManageCache = () => {
     watch(() => route.meta.keepAlive, (shouldCache, oldShouldCache) => {
+      // 优先使用 cacheName，回退到 route.name
       const cacheName = (route.meta.cacheName as string) || (route.name as string)
 
-      if (!cacheName) {
-        console.warn('autoManageCache: 无法确定缓存名称')
+      // 路由未初始化时静默跳过（避免初始加载时的警告）
+      if (!cacheName || !route.name) {
         return
       }
 
-      // 记录缓存统计
-      if (shouldCache === true && oldShouldCache !== true) {
-        cacheStats.totalHits++
-        cacheStats.componentStates.set(cacheName, {
-          lastActivated: Date.now(),
-          cacheHits: (cacheStats.componentStates.get(cacheName)?.cacheHits || 0) + 1
-        })
-      } else if (shouldCache === false) {
+      // 当缓存被禁用时：排除并移除
+      if (shouldCache === false) {
         cacheStats.totalMisses++
         addToExclude(cacheName)
         removeFromCache(cacheName)
-      } else {
+        return
+      }
+
+      // 当缓存被启用时
+      if (shouldCache === true) {
         removeFromExclude(cacheName)
-        // 只有在路由配置中明确启用keepAlive时才添加到缓存
-        if (shouldCache === true) {
-          addToCache(cacheName)
+        addToCache(cacheName)
+
+        // 记录缓存统计（仅在首次启用时）
+        if (oldShouldCache !== true) {
+          cacheStats.totalHits++
+          const existing = cacheStats.componentStates.get(cacheName)
+          cacheStats.componentStates.set(cacheName, {
+            lastActivated: Date.now(),
+            cacheHits: (existing?.cacheHits || 0) + 1
+          })
         }
       }
     }, { immediate: true })

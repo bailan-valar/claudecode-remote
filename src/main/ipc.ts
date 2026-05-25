@@ -116,6 +116,21 @@ export function registerIpcHandlers(win: BrowserWindow) {
     return { ok: true }
   })
 
+  ipcMain.removeHandler('claude:history')
+  ipcMain.handle('claude:history', async (_, projectId: string) => {
+    return api.getChatHistoryAction(projectId)
+  })
+
+  ipcMain.removeHandler('claude:messages:save')
+  ipcMain.handle('claude:messages:save', async (_, message) => {
+    return api.saveChatMessageAction(message)
+  })
+
+  ipcMain.removeHandler('claude:history:clear')
+  ipcMain.handle('claude:history:clear', async (_, projectId: string) => {
+    return api.clearChatHistoryAction(projectId)
+  })
+
   // --- Webhook handlers ---
   ipcMain.removeHandler('webhook:test')
   ipcMain.handle('webhook:test', async (_, webhookUrl: string) => api.testWebhookAction(webhookUrl))
@@ -177,5 +192,51 @@ export function registerIpcHandlers(win: BrowserWindow) {
       isPendingRestart: manager.isPendingRestart(),
       lastRestartState: manager.getLastRestartState()
     }
+  })
+
+  // --- HMR handlers ---
+  ipcMain.removeHandler('hmr:status')
+  ipcMain.handle('hmr:status', async () => {
+    const { getHMRManager } = await import('./utils/hmrManager')
+    const hmrManager = getHMRManager()
+
+    return {
+      ok: true,
+      stats: hmrManager.getStats(),
+      config: hmrManager.getConfig(),
+      isRunning: hmrManager.isEnabled()
+    }
+  })
+
+  ipcMain.removeHandler('hmr:start')
+  ipcMain.handle('hmr:start', async () => {
+    const { getHMRManager } = await import('./utils/hmrManager')
+    const hmrManager = getHMRManager()
+
+    if (!hmrManager.isEnabled()) {
+      hmrManager.start()
+    }
+
+    return { ok: true, enabled: hmrManager.isEnabled() }
+  })
+
+  ipcMain.removeHandler('hmr:stop')
+  ipcMain.handle('hmr:stop', async () => {
+    const { getHMRManager } = await import('./utils/hmrManager')
+    const hmrManager = getHMRManager()
+
+    if (hmrManager.isEnabled()) {
+      hmrManager.stop()
+    }
+
+    return { ok: true }
+  })
+
+  ipcMain.removeHandler('hmr:reload')
+  ipcMain.handle('hmr:reload', async (_, type: 'main' | 'renderer' | 'all') => {
+    const { getHMRManager } = await import('./utils/hmrManager')
+    await getHMRManager().manualReload(type)
+
+    return { ok: true, message: `Reload triggered for ${type}` }
   })
 }

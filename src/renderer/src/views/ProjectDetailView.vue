@@ -8,9 +8,10 @@ import TaskEditDialog from '../components/TaskEditDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import TaskListItem from '../components/TaskListItem.vue'
 import { apiClient } from '../api/index'
-import type { Project } from '../../../shared/types'
+import type { Project, Task } from '../../../shared/types'
 import type { LogEntry } from '../../../main/engine/runner'
-import type { TaskStatus, Task } from '../../../shared/constants'
+import { TASK_STATUS, type TaskStatus } from '../../../shared/constants'
+import { STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
 
 defineOptions({
   name: 'ProjectDetailView'
@@ -144,10 +145,62 @@ function handleTaskEdit(taskId: string) {
   }
 }
 
-// 为项目详情页添加排序后的任务列表
+// 状态分组顺序（按工作流排列）
+const STATUS_ORDER: TaskStatus[] = [
+  TASK_STATUS.PLANNED,
+  TASK_STATUS.PLAN_REQUIRED,
+  TASK_STATUS.PLANNING,
+  TASK_STATUS.PLAN_REVIEWING,
+  TASK_STATUS.PENDING,
+  TASK_STATUS.DEVELOPING,
+  TASK_STATUS.REVIEWING,
+  TASK_STATUS.COMPLETED,
+  TASK_STATUS.CLOSED,
+  TASK_STATUS.STOPPED,
+  TASK_STATUS.FAILED,
+]
+
+// 手风琴收起状态
+const collapsedGroups = ref<Set<TaskStatus>>(new Set())
+
+function toggleGroup(status: TaskStatus) {
+  const next = new Set(collapsedGroups.value)
+  if (next.has(status)) {
+    next.delete(status)
+  } else {
+    next.add(status)
+  }
+  collapsedGroups.value = next
+}
+
+function expandAll() {
+  collapsedGroups.value = new Set()
+}
+
+function collapseAll() {
+  collapsedGroups.value = new Set(STATUS_ORDER)
+}
+
+// 按状态分组并排序
+const groupedTasks = computed(() => {
+  const list = taskStore.filteredTasks
+  const map = {} as Record<TaskStatus, Task[]>
+  STATUS_ORDER.forEach((s) => {
+    const filtered = list.filter((t) => t.status === s)
+    filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    map[s] = filtered
+  })
+  return map
+})
+
+// 只显示有任务的状态（保持顺序）
+const visibleStatusList = computed(() => {
+  return STATUS_ORDER.filter((s) => groupedTasks.value[s].length > 0)
+})
+
+// 兼容：所有任务展平列表（用于编辑对话框等）
 const sortedTasks = computed(() => {
   const list = taskStore.filteredTasks
-  // Sort by updatedAt in descending order (most recent first)
   return [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 })
 
@@ -267,7 +320,7 @@ async function handleSendChat() {
           role: 'assistant',
           content: assistantMsg.content,
           timestamp: assistantMsg.timestamp,
-          sessionId: chatSessionId.value,
+          sessionId: chatSessionId.value || generateSessionId(),
           status: 'done'
         })
       } catch (err) {
@@ -535,23 +588,52 @@ onUnmounted(() => {
       <!-- 任务列表 -->
       <section v-show="activeTab === 'tasks'" class="tasks">
         <div class="tasks-header">
+          <div class="tasks-header-actions">
+            <button class="glass-button" @click="expandAll">全部展开</button>
+            <button class="glass-button" @click="collapseAll">全部收起</button>
+          </div>
           <button class="glass-button primary" @click="openCreateTaskDialog">+ 新建任务</button>
         </div>
 
-        <ul v-if="sortedTasks.length" class="task-list">
-          <TaskListItem
-            v-for="t in sortedTasks"
-            :key="t._id"
-            :task="t"
-            :tick="tick"
-            :show-priority="true"
-            mode="compact"
-            @navigate="handleTaskNavigate"
-            @transition="handleTaskTransition"
-            @edit="handleTaskEdit"
-            @delete="deletingTaskId = $event"
-          />
-        </ul>
+        <div v-if="sortedTasks.length" class="task-groups">
+          <div
+            v-for="status in visibleStatusList"
+            :key="status"
+            class="task-group"
+            :class="{ 'group-collapsed': collapsedGroups.has(status) }"
+          >
+            <button
+              class="group-header"
+              :style="{ '--group-color': STATUS_COLOR[status] }"
+              @click="toggleGroup(status)"
+            >
+              <span class="group-toggle-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </span>
+              <span class="group-dot" :style="{ backgroundColor: STATUS_COLOR[status] }"></span>
+              <span class="group-label">{{ STATUS_LABEL[status] }}</span>
+              <span class="group-count">{{ groupedTasks[status].length }}</span>
+            </button>
+            <div class="group-body-wrapper">
+              <ul class="group-body task-list">
+                <TaskListItem
+                  v-for="t in groupedTasks[status]"
+                  :key="t._id"
+                  :task="t"
+                  :tick="tick"
+                  :show-priority="true"
+                  mode="compact"
+                  @navigate="handleTaskNavigate"
+                  @transition="handleTaskTransition"
+                  @edit="handleTaskEdit"
+                  @delete="deletingTaskId = $event"
+                />
+              </ul>
+            </div>
+          </div>
+        </div>
         <p v-else class="empty">该项目暂无任务</p>
       </section>
 
@@ -817,11 +899,17 @@ header .actions {
 /* ── 任务列表 ── */
 .tasks-header {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 2px;
+  margin-bottom: var(--space-md);
   flex-wrap: wrap;
   gap: var(--space-sm);
+}
+
+.tasks-header-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
 }
 
 .task-list {
@@ -831,6 +919,96 @@ header .actions {
   display: flex;
   flex-direction: column;
   gap: 0px;
+}
+
+/* ── 手风琴状态分组 ── */
+.task-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.task-group {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  overflow: hidden;
+  transition: box-shadow var(--transition-fast);
+}
+
+.task-group:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+  transition: background var(--transition-fast);
+  text-align: left;
+}
+
+.group-header:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.group-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast);
+  color: var(--color-text-secondary);
+}
+
+.group-collapsed .group-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.group-label {
+  flex: 1;
+}
+
+.group-count {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  min-width: 24px;
+  text-align: center;
+}
+
+.group-body-wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--transition-fast) ease-out;
+}
+
+.group-collapsed .group-body-wrapper {
+  grid-template-rows: 0fr;
+}
+
+.group-body {
+  overflow: hidden;
+  padding: 0 var(--space-sm) var(--space-sm);
 }
 
 /* 手机端更紧凑的间隔 */

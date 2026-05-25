@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Project, Task } from '../shared/types'
+import type { Project, Task, ChatMessage } from '../shared/types'
 import type { LogEntry } from '../main/engine/runner'
 
 export type SyncStatus =
@@ -78,6 +78,9 @@ const api = {
   chatWithClaude: (projectId: string, message: string, sessionId?: string) =>
     ipcRenderer.invoke('claude:chat', projectId, message, sessionId),
   abortClaudeChat: () => ipcRenderer.invoke('claude:chat:abort'),
+  getChatHistory: (projectId: string) => ipcRenderer.invoke('claude:history', projectId),
+  saveChatMessage: (message: Omit<ChatMessage, '_id' | '_rev'>) => ipcRenderer.invoke('claude:messages:save', message),
+  clearChatHistory: (projectId: string) => ipcRenderer.invoke('claude:history:clear', projectId),
   onClaudeChatLog: (cb: (entry: LogEntry) => void): (() => void) => {
     const listener = (_: unknown, entry: LogEntry) => cb(entry)
     ipcRenderer.on('claude:chat:log', listener)

@@ -62,7 +62,7 @@ let configCache: RestartConfig | null = null
 
 export function getRestartConfig(): RestartConfig {
   if (configCache) {
-    return configCache
+    return configCache!
   }
 
   try {
@@ -101,7 +101,7 @@ export function getRestartConfig(): RestartConfig {
     configCache = DEFAULT_CONFIG
   }
 
-  return configCache
+  return configCache!
 }
 
 export function shouldAutoRestart(): boolean {

@@ -65,6 +65,7 @@ export class TaskEngine extends EventEmitter {
   private projectLocks = new Map<string, Promise<void>>()
   private stoppedTaskIds = new Set<string>()
   private queuedTaskIds = new Set<string>()
+  private taskEnqueueLocks = new Map<string, Promise<void>>() // 任务级入队锁，防止并发入队同一个任务
 
   constructor(options: EngineOptions) {
     super()
@@ -218,21 +219,49 @@ export class TaskEngine extends EventEmitter {
     }
   }
 
-  private _enqueue(task: Task): void {
+  private async _enqueue(task: Task): Promise<void> {
     if (!this._running) return
+
+    // 获取任务级入队锁，防止同一个任务被并发入队
+    const existingLock = this.taskEnqueueLocks.get(task._id)
+    if (existingLock) {
+      await existingLock // 等待现有的入队操作完成
+    }
+
+    // 双重检查：在获取锁后再次检查任务状态
     if (this.runningTasks.has(task._id)) return
     if (this.queuedTaskIds.has(task._id)) return
 
-    this.queuedTaskIds.add(task._id)
-    this.queue.add(async () => {
-      try {
-        await this._executeWithProjectLock(task)
-      } finally {
-        this.queuedTaskIds.delete(task._id)
-      }
+    let resolveLock!: () => void
+    const currentLock = new Promise<void>((resolve) => {
+      resolveLock = resolve
     })
+    this.taskEnqueueLocks.set(task._id, currentLock)
 
-    this.emit('status', this.getStatus())
+    try {
+      // 第三次检查：在设置锁后再次确认
+      if (this.runningTasks.has(task._id)) return
+      if (this.queuedTaskIds.has(task._id)) return
+
+      this.queuedTaskIds.add(task._id)
+      this.queue.add(async () => {
+        try {
+          await this._executeWithProjectLock(task)
+        } finally {
+          this.queuedTaskIds.delete(task._id)
+        }
+      })
+
+      this.emit('status', this.getStatus())
+    } finally {
+      resolveLock()
+      // 清理锁，避免内存泄漏
+      setTimeout(() => {
+        if (this.taskEnqueueLocks.get(task._id) === currentLock) {
+          this.taskEnqueueLocks.delete(task._id)
+        }
+      }, 1000)
+    }
   }
 
   private async _executeWithProjectLock(task: Task): Promise<void> {
@@ -240,6 +269,17 @@ export class TaskEngine extends EventEmitter {
     const prevLock = this.projectLocks.get(task.projectId)
     if (prevLock) {
       await prevLock
+    }
+
+    // 在获取项目锁后，再次检查任务状态
+    if (!this._running) {
+      console.log(`[engine] engine stopped before executing task ${task._id}`)
+      return
+    }
+
+    if (this.stoppedTaskIds.has(task._id)) {
+      console.log(`[engine] task ${task._id} was marked as stopped`)
+      return
     }
 
     let resolveLock!: () => void

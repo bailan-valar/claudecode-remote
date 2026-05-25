@@ -15,6 +15,7 @@ const emit = defineEmits<{
   move: [taskId: string, status: TaskStatus]
   edit: [taskId: string]
   delete: [taskId: string]
+  addSubtask: [taskId: string]
 }>()
 
 const statusList = Object.values(TASK_STATUS) as TaskStatus[]
@@ -89,6 +90,7 @@ function onDrop(e: DragEvent, status: TaskStatus) {
           @dragstart="onDragStart"
           @edit="emit('edit', $event)"
           @delete="emit('delete', $event)"
+          @add-subtask="emit('addSubtask', $event)"
         />
       </div>
     </div>

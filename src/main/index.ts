@@ -111,6 +111,21 @@ app.whenReady().then(async () => {
     console.error('[main] failed to start web server:', err.message)
   }
 
+  // 启动 HMR 热重载管理器
+  try {
+    const { getHMRManager } = await import('./utils/hmrManager')
+    const hmrManager = getHMRManager()
+    hmrManager.setMainWindow(win)
+
+    // 只在开发环境下启动HMR
+    if (process.env.NODE_ENV !== 'production') {
+      hmrManager.start()
+      console.log('[main] HMR manager started')
+    }
+  } catch (err: any) {
+    console.error('[main] failed to start HMR manager:', err.message)
+  }
+
   // 检查重启状态
   const { getRestartManager } = await import('./utils/restartManager')
   const restartManager = getRestartManager()

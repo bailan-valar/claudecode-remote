@@ -5,16 +5,16 @@ import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
 import { apiClient } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
-import TaskStatusActions from '../components/TaskStatusActions.vue'
 import TaskListItem from '../components/TaskListItem.vue'
-import TaskEditPanel from '../components/TaskEditPanel.vue'
+import TaskItemDropdown from '../components/TaskItemDropdown.vue'
+import TaskEditDialog from '../components/TaskEditDialog.vue'
 import TaskAppendPanel from '../components/TaskAppendPanel.vue'
 import TaskCreatePanel from '../components/TaskCreatePanel.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { formatDuration } from '../utils/formatDuration'
 import { isTracking, calculateLiveDuration } from '../utils/timeTracking'
 import { TASK_STATUS, KIND_LABEL } from '../../../shared/constants'
-import { STATUS_LABEL } from '../utils/taskTransitions'
+import { STATUS_LABEL, getAllowedNext } from '../utils/taskTransitions'
 import type { Task, StatusHistoryEntry } from '../../../shared/types'
 
 defineOptions({
@@ -28,8 +28,9 @@ const projectStore = useProjectStore()
 
 const taskId = route.params.id as string
 const task = ref<Task | undefined>()
-const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
+const showTaskDialog = ref(false)
+const editingTask = ref<Task | undefined>(undefined)
 const liveDuration = ref(0)
 let timerId: ReturnType<typeof setInterval> | null = null
 
@@ -73,6 +74,45 @@ const showAppendPanel = ref(false)
 // 新增子任务
 const showSubtaskPanel = ref(false)
 const showPlanFullscreen = ref(false)
+
+// 更多下拉菜单
+const showDropdown = ref(false)
+const showStatusSubmenu = ref(false)
+const dropdownRef = ref<HTMLElement | null>(null)
+const dropdownStyle = ref({ top: '0px', right: '0px' })
+
+const nextStates = computed(() => getAllowedNext(task.value?.status ?? 'pending', task.value))
+
+function updateDropdownPosition() {
+  const btn = dropdownRef.value
+  if (!btn) return
+  const rect = btn.getBoundingClientRect()
+  dropdownStyle.value = {
+    top: `${rect.bottom + 4}px`,
+    right: `${window.innerWidth - rect.right}px`,
+  }
+}
+
+function toggleDropdown(e: Event) {
+  e.preventDefault()
+  e.stopPropagation()
+  showDropdown.value = !showDropdown.value
+  showStatusSubmenu.value = false
+  if (showDropdown.value) {
+    updateDropdownPosition()
+  }
+}
+
+function closeDropdown() {
+  showDropdown.value = false
+  showStatusSubmenu.value = false
+}
+
+function handleClickOutside(e: Event) {
+  if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
+    closeDropdown()
+  }
+}
 
 // 继续执行
 const isResuming = ref(false)
@@ -197,6 +237,7 @@ function stopTimer() {
 }
 
 onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
   stopTimer()
   if (refreshTimerId) {
     clearInterval(refreshTimerId)
@@ -209,6 +250,7 @@ onUnmounted(() => {
 })
 
 onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
   task.value = taskStore.tasks.find((t) => t._id === taskId)
   if (!task.value) taskStore.fetch()
   projectStore.fetch()
@@ -243,11 +285,15 @@ async function handleTransition(status: Task['status']) {
 }
 
 async function handleUpdate(changes?: Partial<Task>) {
-  if (!task.value || !changes) return
-  const result = await taskStore.update(task.value._id, changes)
+  if (!editingTask.value || !changes) return
+  const result = await taskStore.update(editingTask.value._id, changes)
   if (result.ok) {
-    task.value = result.task
-    isEditing.value = false
+    if (task.value && task.value._id === editingTask.value._id) {
+      task.value = result.task
+    }
+    showTaskDialog.value = false
+    editingTask.value = undefined
+    await taskStore.fetch()
   }
 }
 
@@ -283,8 +329,12 @@ async function handleCreateSubtask(changes?: Partial<Task>) {
 }
 
 // ── 子任务操作 ──
-async function handleEditChildTask(childTaskId: string) {
-  router.push({ name: 'task-detail', params: { id: childTaskId } })
+function openEditDialog(taskId: string) {
+  const t = taskStore.tasks.find((x) => x._id === taskId)
+  if (t) {
+    editingTask.value = t
+    showTaskDialog.value = true
+  }
 }
 
 const deletingChildTaskId = ref<string | null>(null)
@@ -359,7 +409,7 @@ watch(() => task.value?.logs, () => {
     <header>
       <div class="header-left">
         <template v-if="!isEditingStatus">
-          <StatusBadge :status="task.status" :class="['status-editable', { disabled: isEditing }]" @click="!isEditing && startEditStatus()" />
+          <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus()" />
         </template>
         <select
           v-else
@@ -369,23 +419,32 @@ watch(() => task.value?.logs, () => {
         >
           <option v-for="s in Object.values(TASK_STATUS)" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
         </select>
-        <h1 v-if="!isEditing" class="page-title">{{ task.title }}</h1>
+        <h1 class="page-title">{{ task.title }}</h1>
       </div>
-      <div class="actions">
-        <button class="glass-button" :class="{ active: showAppendPanel }" @click="showAppendPanel = !showAppendPanel; showSubtaskPanel = false">追加任务</button>
-        <button class="glass-button" :class="{ active: showSubtaskPanel }" @click="showSubtaskPanel = !showSubtaskPanel; showAppendPanel = false">新增子任务</button>
-        <button v-if="!isEditing" class="glass-button" @click="isEditing = true">编辑</button>
-        <button v-else class="glass-button" @click="isEditing = false">取消编辑</button>
-        <button class="glass-button danger" @click="showDeleteConfirm = true">删除</button>
+      <div class="header-actions">
+        <div class="dropdown" :class="{ 'dropdown-active': showDropdown }" ref="dropdownRef">
+          <button class="glass-button btn-more" @click="toggleDropdown">
+            <span class="more-icon">•••</span>
+          </button>
+          <TaskItemDropdown
+            :task="task"
+            :show-dropdown="showDropdown"
+            :show-status-submenu="showStatusSubmenu"
+            :next-states="nextStates"
+            :dropdown-style="dropdownStyle"
+            show-append
+            show-subtask
+            @edit="openEditDialog(task._id)"
+            @transition="handleTransition"
+            @append="showAppendPanel = true"
+            @create-subtask="showSubtaskPanel = true"
+            @delete="showDeleteConfirm = true"
+            @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+            @close="closeDropdown"
+          />
+        </div>
       </div>
     </header>
-
-    <TaskEditPanel
-      v-model:editing="isEditing"
-      :task="task"
-      :projects="projectStore.projects"
-      @submit="handleUpdate"
-    />
 
     <!-- 追加任务面板 -->
     <div v-if="showAppendPanel" class="form-panel glass">
@@ -415,12 +474,12 @@ watch(() => task.value?.logs, () => {
 
     <!-- 详情 Tab -->
     <div v-if="activeTab === 'detail'" class="tab-content">
-      <section v-if="!isEditing" class="info glass">
+      <section class="info glass">
       <div class="info-row">
         <span class="info-label">状态</span>
         <span class="info-value">
           <template v-if="!isEditingStatus">
-            <StatusBadge :status="task.status" :class="['status-editable', { disabled: isEditing }]" @click="!isEditing && startEditStatus()" />
+            <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus()" />
           </template>
           <select
             v-else
@@ -506,7 +565,7 @@ watch(() => task.value?.logs, () => {
           :key="ct._id"
           mode="compact"
           :task="ct"
-          @edit="handleEditChildTask"
+          @edit="openEditDialog($event)"
           @delete="deletingChildTaskId = $event"
         />
       </ul>
@@ -522,12 +581,6 @@ watch(() => task.value?.logs, () => {
       </div>
     </section>
 
-    <section class="transitions">
-      <h2 class="section-title">状态流转</h2>
-      <div class="transitions-panel glass">
-        <TaskStatusActions :status="task.status" :task="task" @transition="handleTransition" />
-      </div>
-    </section>
     </div>
 
     <!-- 执行日志 Tab -->
@@ -610,6 +663,16 @@ watch(() => task.value?.logs, () => {
       @confirm="handleDeleteChildTask(deletingChildTaskId!)"
       @cancel="deletingChildTaskId = null"
     />
+
+    <TaskEditDialog
+      :visible="showTaskDialog"
+      :task="editingTask"
+      :projects="projectStore.projects"
+      :tasks="taskStore.tasks"
+      mode="edit"
+      @submit="handleUpdate"
+      @cancel="showTaskDialog = false; editingTask = undefined"
+    />
   </div>
 </template>
 
@@ -647,9 +710,35 @@ header .page-title {
   font-size: 1.5rem;
 }
 
-header .actions {
+header .header-actions {
   display: flex;
-  gap: var(--space-sm);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+header .dropdown {
+  position: relative;
+}
+
+header .dropdown-active .btn-more {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: var(--color-accent);
+}
+
+header .btn-more {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+header .more-icon {
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  line-height: 1;
 }
 
 .form-panel {
@@ -774,14 +863,6 @@ header .actions {
 
 .log-entry.error .log-message {
   color: var(--color-error);
-}
-
-.transitions {
-  margin-top: var(--space-2xl);
-}
-
-.transitions-panel {
-  padding: var(--space-lg);
 }
 
 /* ── 父任务链接 ── */
@@ -1088,14 +1169,6 @@ header .actions {
     max-height: 200px;
   }
 
-  .transitions-panel :deep(.actions) {
-    flex-direction: column;
-  }
-
-  .transitions-panel :deep(.actions button) {
-    width: 100%;
-    min-height: 44px;
-  }
 }
 
 /* ── Session ID 显示 ── */

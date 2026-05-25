@@ -4,12 +4,14 @@ import { useRouter } from 'vue-router'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useProjectStore } from '../stores/useProjectStore'
 import TaskCreatePanel from '../components/TaskCreatePanel.vue'
+import TaskEditDialog from '../components/TaskEditDialog.vue'
 import TaskFilters from '../components/TaskFilters.vue'
 import KanbanBoard from '../components/KanbanBoard.vue'
-import TaskListItem from '../components/TaskListItem.vue'
+import TaskTreeList from '../components/TaskTreeList.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import type { TaskStatus } from '../../../shared/constants'
+import type { Task } from '../../../shared/types'
 
 defineOptions({
   name: 'TasksView'
@@ -22,8 +24,48 @@ const showForm = ref(false)
 const selectedProjectId = ref<string | null>(null)
 const selectedStatus = ref<TaskStatus | null>(null)
 const deletingTaskId = ref<string | null>(null)
+const showTaskDialog = ref(false)
+const editingTask = ref<Task | undefined>(undefined)
 const viewMode = ref<'list' | 'kanban'>('list')
-const listDensity = ref<'comfortable' | 'compact'>('comfortable')
+const listDensity = ref<'comfortable' | 'compact'>('compact')
+const subtaskParentId = ref<string | null>(null)
+
+function openCreateForm() {
+  subtaskParentId.value = null
+  showForm.value = true
+}
+
+function handleAddSubtask(taskId: string) {
+  const task = taskStore.tasks.find((t) => t._id === taskId)
+  if (task) {
+    subtaskParentId.value = taskId
+    showForm.value = true
+  }
+}
+
+function openEditDialog(taskId: string) {
+  const task = taskStore.tasks.find((t) => t._id === taskId)
+  if (task) {
+    editingTask.value = task
+    showTaskDialog.value = true
+  }
+}
+
+function closeTaskDialog() {
+  showTaskDialog.value = false
+  editingTask.value = undefined
+}
+
+async function handleTaskDialogSubmit(task?: Task, changes?: Partial<Task>) {
+  showTaskDialog.value = false
+  editingTask.value = undefined
+  if (task && changes) {
+    const result = await taskStore.update(task._id, changes)
+    if (result.ok) {
+      await taskStore.fetch()
+    }
+  }
+}
 
 function setViewMode(mode: 'list' | 'kanban') {
   viewMode.value = mode
@@ -123,7 +165,7 @@ onUnmounted(() => {
             紧凑
           </button>
         </div>
-        <button class="glass-button primary" @click="showForm = true">+ 新建任务</button>
+        <button class="glass-button primary" @click="openCreateForm">+ 新建任务</button>
       </div>
     </header>
 
@@ -132,8 +174,11 @@ onUnmounted(() => {
       v-model:visible="showForm"
       :projects="projectStore.projects"
       :tasks="taskStore.tasks"
-      @submit="showForm = false"
-      @cancel="showForm = false"
+      :default-project-id="subtaskParentId ? (taskStore.tasks.find((t) => t._id === subtaskParentId)?.projectId ?? '') : ''"
+      :default-parent-task-id="subtaskParentId ?? undefined"
+      :title="subtaskParentId ? '添加子任务' : '新建任务'"
+      @submit="showForm = false; subtaskParentId = null"
+      @cancel="showForm = false; subtaskParentId = null"
     />
 
     <div class="filters-bar">
@@ -156,22 +201,21 @@ onUnmounted(() => {
         :project-name-map="projectNameMap"
         :tick="tick"
         @move="handleMove"
-        @edit="router.push({ name: 'task-detail', params: { id: $event } })"
+        @edit="openEditDialog($event)"
         @delete="deletingTaskId = $event"
+        @add-subtask="handleAddSubtask"
       />
-      <ul v-else class="task-list">
-        <TaskListItem
-          v-for="t in displayTasks"
-          :key="t._id"
-          :task="t"
-          :project-name="projectNameMap.get(t.projectId) ?? t.projectId"
-          :tick="tick"
-          :mode="listDensity === 'compact' ? 'compact' : 'list'"
-          @transition="taskStore.updateStatus(t._id, $event)"
-          @edit="router.push({ name: 'task-detail', params: { id: $event } })"
-          @delete="deletingTaskId = $event"
-        />
-      </ul>
+      <TaskTreeList
+        v-else
+        :tasks="displayTasks"
+        :project-name-map="projectNameMap"
+        :tick="tick"
+        :mode="listDensity"
+        @transition="taskStore.updateStatus($event[0], $event[1] as TaskStatus)"
+        @edit="openEditDialog($event)"
+        @delete="deletingTaskId = $event"
+        @add-subtask="handleAddSubtask"
+      />
     </template>
 
     <ConfirmDialog
@@ -180,6 +224,16 @@ onUnmounted(() => {
       :visible="deletingTaskId !== null"
       @confirm="taskStore.remove(deletingTaskId!); deletingTaskId = null"
       @cancel="deletingTaskId = null"
+    />
+
+    <TaskEditDialog
+      :visible="showTaskDialog"
+      :task="editingTask"
+      :projects="projectStore.projects"
+      :tasks="taskStore.tasks"
+      mode="edit"
+      @submit="handleTaskDialogSubmit"
+      @cancel="closeTaskDialog"
     />
   </div>
 </template>
