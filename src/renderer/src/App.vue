@@ -23,6 +23,12 @@ function handleFloatingButtonClick() {
   } else if (route.path === '/') {
     // 首页：跳转到任务页面
     router.push('/tasks')
+  } else if (route.path === '/projects') {
+    // 项目页面：跳转到第一个项目详情页
+    const projectStore = useProjectStore()
+    if (projectStore.projects.length > 0) {
+      router.push(`/projects/${projectStore.projects[0]._id}`)
+    }
   } else if (route.path === '/settings') {
     // 设置页面：可以打开设置相关的快捷功能
     // 这里暂时不做处理，可以根据需要添加
@@ -78,6 +84,10 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
             <span class="nav-icon">⌂</span>
             <span class="nav-label">首页</span>
           </RouterLink>
+          <RouterLink to="/projects" class="nav-item" title="项目">
+            <span class="nav-icon">▦</span>
+            <span class="nav-label">项目</span>
+          </RouterLink>
           <RouterLink to="/tasks" class="nav-item" title="任务">
             <span class="nav-icon">▤</span>
             <span class="nav-label">任务</span>
@@ -105,6 +115,10 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
         <RouterLink to="/" class="mobile-nav-item">
           <span class="mobile-icon">⌂</span>
           <span class="mobile-label">首页</span>
+        </RouterLink>
+        <RouterLink to="/projects" class="mobile-nav-item">
+          <span class="mobile-icon">▦</span>
+          <span class="mobile-label">项目</span>
         </RouterLink>
         <RouterLink to="/tasks" class="mobile-nav-item">
           <span class="mobile-icon">▤</span>
