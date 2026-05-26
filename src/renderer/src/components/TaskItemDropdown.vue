@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Teleport, computed } from 'vue'
+import { Teleport, computed, ref, watch, onUnmounted } from 'vue'
 import type { Task } from '../../../shared/types'
 import type { TaskStatus } from '../../../shared/constants'
 import { TRANSITION_LABEL, STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
@@ -28,14 +28,68 @@ const emit = defineEmits<{
   createSubtask: [taskId: string]
 }>()
 
-// 计算状态菜单的位置（在主菜单右侧）
+// 延迟隐藏菜单的定时器
+let hideTimer: ReturnType<typeof setTimeout> | null = null
+
+// 清除隐藏定时器
+function clearHideTimer() {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
+}
+
+// 延迟隐藏菜单
+function delayHide() {
+  clearHideTimer()
+  hideTimer = setTimeout(() => {
+    emit('toggleSubmenu', false)
+  }, 300) // 300ms延迟，给用户足够时间移动鼠标
+}
+
+// 立即显示菜单
+function showMenu() {
+  clearHideTimer()
+  emit('toggleSubmenu', true)
+}
+
+// 计算状态菜单的位置（在主菜单左侧屏幕右侧）
 const statusMenuStyle = computed(() => {
   const right = parseFloat(props.dropdownStyle.right)
   const top = parseFloat(props.dropdownStyle.top)
 
+  // right是距离浏览器右边的距离
+  // 要在主菜单的左侧（屏幕右侧）显示，需要加上主菜单宽度和间距
+  const mainMenuWidth = props.compact ? 140 : 160 // 主菜单宽度
+  const gap = 4 // 两个菜单之间的间距
+
   return {
     top: `${top}px`,
-    right: `${right + 180}px`, // 在主菜单右侧180px处
+    right: `${right + mainMenuWidth + gap}px`, // 在主菜单左侧，距离浏览器右边更远
+  }
+})
+
+// 计算桥梁区域的位置（连接两个菜单）
+const bridgeStyle = computed(() => {
+  const right = parseFloat(props.dropdownStyle.right)
+  const top = parseFloat(props.dropdownStyle.top)
+
+  const mainMenuWidth = props.compact ? 140 : 160 // 主菜单宽度
+  const sideMenuWidth = props.compact ? 140 : 180 // 状态菜单宽度
+  const gap = 4 // 两个菜单之间的间距
+
+  return {
+    top: `${top}px`,
+    right: `${right + mainMenuWidth}px`, // 从主菜单左边开始
+    width: `${gap + sideMenuWidth}px`, // 覆盖到状态菜单右边
+    height: '400px', // 足够覆盖菜单高度
+  }
+})
+
+// 监听showDropdown变化，关闭时清除定时器
+watch(() => props.showDropdown, (newVal) => {
+  if (!newVal) {
+    clearHideTimer()
   }
 })
 
@@ -68,6 +122,11 @@ function onCreateSubtask() {
   emit('createSubtask', props.task._id)
   emit('close')
 }
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearHideTimer()
+})
 </script>
 
 <template>
@@ -92,8 +151,8 @@ function onCreateSubtask() {
       <div class="dropdown-divider"></div>
       <button
         class="dropdown-item has-submenu"
-        @mouseenter="emit('toggleSubmenu', true)"
-        @mouseleave="emit('toggleSubmenu', false)"
+        @mouseenter="showMenu"
+        @mouseleave="delayHide"
       >
         <span class="dropdown-icon">🔀</span>
         修改状态
@@ -121,8 +180,8 @@ function onCreateSubtask() {
       class="status-side-menu"
       :class="{ compact }"
       :style="statusMenuStyle"
-      @mouseenter="emit('toggleSubmenu', true)"
-      @mouseleave="emit('toggleSubmenu', false)"
+      @mouseenter="showMenu"
+      @mouseleave="delayHide"
       @click.stop
     >
       <div class="status-menu-header">选择状态</div>
@@ -141,6 +200,15 @@ function onCreateSubtask() {
         </div>
       </div>
     </div>
+
+    <!-- 桥梁区域：连接两个菜单，防止鼠标移动时意外隐藏 -->
+    <div
+      v-show="showDropdown && showStatusSubmenu"
+      class="menu-bridge"
+      :style="bridgeStyle"
+      @mouseenter="showMenu"
+      @mouseleave="delayHide"
+    ></div>
   </Teleport>
 </template>
 
@@ -242,7 +310,8 @@ function onCreateSubtask() {
   min-width: 160px;
   z-index: 1000;
   overflow: hidden;
-  animation: menuSlideIn 0.2s ease-out;
+  animation: menuSlideIn 0.25s ease-out;
+  transition: opacity 0.2s ease-out;
 }
 
 .status-side-menu.compact {
@@ -254,7 +323,7 @@ function onCreateSubtask() {
 @keyframes menuSlideIn {
   from {
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(10px);
   }
   to {
     opacity: 1;
@@ -323,6 +392,14 @@ function onCreateSubtask() {
 
 .status-label {
   flex: 1;
+}
+
+/* 桥梁区域：连接两个菜单 */
+.menu-bridge {
+  position: fixed;
+  z-index: 999;
+  pointer-events: auto;
+  background: transparent;
 }
 
 .dropdown-icon {
