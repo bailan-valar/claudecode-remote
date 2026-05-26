@@ -1,184 +1,187 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code (claude.ai/code) 提供针对本仓库代码的工作指引。
 
-## Project Overview
+## 项目概述
 
-ClaudeCode Remote is an Electron desktop client for managing AI-powered development tasks. It uses PouchDB for local data storage with CouchDB sync, and integrates with Claude Code CLI for task execution.
+ClaudeCode Remote 是一款用于管理 AI 驱动开发任务的 Electron 桌面客户端。它使用 PouchDB 进行本地数据存储，并与 CouchDB 同步，同时集成 Claude Code CLI 执行任务。
 
-**Tech Stack:** Electron + Vue 3 + TypeScript + PouchDB + Pinia
+**技术栈：** Electron + Vue 3 + TypeScript + PouchDB + Pinia
 
-## Development Commands
+## 开发命令
 
 ```bash
-# Development (with HMR)
-npm run dev          # Main dev server (port 3456 renderer, 3457 API)
-npm run dev:hmr      # HMR-enabled dev mode (port 8543 API)
+# 开发（支持热更新）
+npm run dev          # 主开发服务（renderer 端口 3456，API 端口 3457）
+npm run dev:hmr      # HMR 开发模式（API 端口 8543）
 
-# Building
-npm run build        # Type-check + electron-vite build
-npm run build:win    # Build Windows installer
-npm run build:mac    # Build macOS installer
-npm run build:linux # Build Linux packages
+# 构建
+npm run build        # 类型检查 + electron-vite 构建
+npm run build:win    # 构建 Windows 安装包
+npm run build:mac    # 构建 macOS 安装包
+npm run build:linux # 构建 Linux 安装包
 
-# Code Quality
-npm run typecheck    # TypeScript type checking
-npm run lint         # ESLint with auto-fix
-npm run format       # Prettier formatting
+# 代码质量
+npm run typecheck    # TypeScript 类型检查
+npm run lint         # ESLint 自动修复
+npm run format       # Prettier 格式化
 
-# Testing
-npm run test         # Run tests (vitest)
+# 测试
+npm run test         # 运行测试（vitest）
 ```
 
-> **注意：** 不要自动运行任何 `npm run` 构建脚本（如 `npm run build`、`npm run build:win` 等）。仅在用户明确要求时，才手动执行相关命令。
+> **Agent 限制：**
+> - 不要自动运行任何 `npm run` 构建脚本（如 `npm run build`、`npm run build:win` 等）。
+> - 不要自动启动开发服务器（如 `npm run dev`、`npm run dev:hmr`）。
+> - 以上命令仅在用户明确要求时，才手动执行。
 
-## Environment Setup
+## 环境配置
 
-Copy `.env.example` to `.env` and configure:
+复制 `.env.example` 为 `.env` 并进行配置：
 
 ```bash
-# CouchDB connection
+# CouchDB 连接
 COUCHDB_URL=http://localhost:5984/cc-remote
 COUCHDB_USER=your_username
 COUCHDB_PASSWORD=your_password
-COUCHDB_ADMIN_USER=admin    # Optional, for creating user DBs
-COUCHDB_ADMIN_PASSWORD=     # Optional
+COUCHDB_ADMIN_USER=admin    # 可选，用于创建用户数据库
+COUCHDB_ADMIN_PASSWORD=     # 可选
 
-# Web server port (for mobile access)
+# Web 服务端口（用于移动端访问）
 WEB_PORT=3457
 ```
 
-CouchDB must have CORS enabled (`enable_cors = true` in `local.ini`).
+CouchDB 必须启用 CORS（在 `local.ini` 中设置 `enable_cors = true`）。
 
-## Architecture
+## 架构
 
-### Process Structure
+### 进程结构
 
-- **Main Process** (`src/main/`): Node.js backend, database, task engine
-- **Renderer Process** (`src/renderer/`): Vue 3 frontend UI
-- **Preload** (`src/preload/`): Context bridge for secure IPC
-- **Shared** (`src/shared/`): TypeScript types shared between processes
+- **主进程** (`src/main/`): Node.js 后端，数据库，任务引擎
+- **渲染进程** (`src/renderer/`): Vue 3 前端 UI
+- **预加载** (`src/preload/`): 安全 IPC 的上下文桥接
+- **共享** (`src/shared/`): 主进程与渲染进程共享的 TypeScript 类型
 
-### Key Directories
+### 关键目录
 
 ```
 src/
 ├── main/
-│   ├── index.ts           # App entry point, window creation
-│   ├── ipc.ts             # IPC handler registration
-│   ├── apiActions.ts      # Business logic for IPC handlers
-│   ├── db.ts              # SyncManager for PouchDB <-> CouchDB
-│   ├── configStore.ts     # App config persistence
-│   ├── webServer.ts       # Express server for mobile web access
+│   ├── index.ts           # 应用入口，窗口创建
+│   ├── ipc.ts             # IPC 处理器注册
+│   ├── apiActions.ts      # IPC 处理器的业务逻辑
+│   ├── db.ts              # PouchDB <-> CouchDB 同步管理器
+│   ├── configStore.ts     # 应用配置持久化
+│   ├── webServer.ts       # 移动端 Web 访问的 Express 服务器
 │   ├── engine/
-│   │   ├── taskEngine.ts  # Task execution queue manager
-│   │   ├── runner.ts      # Task runner interface
-│   │   ├── claudeRunner.ts # Claude Code CLI integration
-│   │   └── runnerRegistry.ts # Runner factory
-│   └── repositories/      # PouchDB data access layer
+│   │   ├── taskEngine.ts  # 任务执行队列管理器
+│   │   ├── runner.ts      # 任务运行器接口
+│   │   ├── claudeRunner.ts # Claude Code CLI 集成
+│   │   └── runnerRegistry.ts # 运行器工厂
+│   └── repositories/      # PouchDB 数据访问层
 │       ├── baseRepository.ts
 │       ├── taskRepository.ts
 │       └── projectRepository.ts
 ├── renderer/
 │   └── src/
-│       ├── api/index.ts   # API client (IPC + HTTP fallback)
-│       ├── stores/        # Pinia stores
-│       ├── views/         # Vue page components
-│       └── components/    # Vue reusable components
+│       ├── api/index.ts   # API 客户端（IPC + HTTP 回退）
+│       ├── stores/        # Pinia 状态管理
+│       ├── views/         # Vue 页面组件
+│       └── components/    # Vue 可复用组件
 └── shared/
-    ├── types.ts           # Shared TypeScript interfaces
-    └── constants.ts       # Shared constants
+    ├── types.ts           # 共享的 TypeScript 接口
+    └── constants.ts       # 共享常量
 ```
 
-### Data Flow
+### 数据流
 
-1. **Renderer → Main:** API calls via `window.api` (IPC) or HTTP (`/api/*`)
-2. **Main Process:** `apiActions.ts` handles business logic
-3. **Repositories:** PouchDB CRUD operations with optimistic locking
-4. **Events:** `mainEvents` EventEmitter broadcasts changes to renderer
-5. **Renderer:** Pinia stores update via SSE events (web) or IPC events (desktop)
+1. **渲染进程 → 主进程:** 通过 `window.api` (IPC) 或 HTTP (`/api/*`) 调用 API
+2. **主进程:** `apiActions.ts` 处理业务逻辑
+3. **仓储层:** PouchDB CRUD 操作，支持乐观锁
+4. **事件:** `mainEvents` EventEmitter 向渲染进程广播变更
+5. **渲染进程:** Pinia 状态通过 SSE 事件 (Web) 或 IPC 事件 (桌面端) 更新
 
-### Task Execution Flow
+### 任务执行流程
 
-1. Task created with status `pending` or `plan_required`
-2. TaskEngine watches PouchDB changes feed for pending tasks
-3. On detection, engine queues task (with project-level serial + global concurrency control)
-4. Runner (Claude Code CLI) executes task in project directory
-5. Status updates: `pending` → `developing` → `reviewing` → `completed`
-6. Webhook notifications sent on completion/failure (企业微信)
+1. 任务以状态 `pending` 或 `plan_required` 创建
+2. TaskEngine 监听 PouchDB changes feed 以发现待处理任务
+3. 检测到后，引擎将任务加入队列（支持项目级串行 + 全局并发控制）
+4. 运行器 (Claude Code CLI) 在项目目录中执行任务
+5. 状态更新: `pending` → `developing` → `reviewing` → `completed`
+6. 完成/失败时发送 Webhook 通知（企业微信）
 
-### Repository Pattern
+### 仓储模式
 
-All database access goes through repository classes in `src/main/repositories/`:
+所有数据库访问均通过 `src/main/repositories/` 中的仓储类进行：
 
 ```typescript
-// BaseRepository provides: findAll, findById, create, update, delete
-// With built-in conflict retry (optimistic locking via _rev)
+// BaseRepository 提供: findAll, findById, create, update, delete
+// 内置冲突重试机制（通过 _rev 实现乐观锁）
 
 const taskRepo = createTaskRepository(db)
 const task = await taskRepo.findById(taskId)
 await taskRepo.update(taskId, { status: 'completed' })
 ```
 
-Document IDs use prefixed UUIDs: `task:{uuid}`, `project:{uuid}`.
+文档 ID 使用带前缀的 UUID: `task:{uuid}`, `project:{uuid}`.
 
-### IPC Communication
+### IPC 通信
 
-Desktop uses `ipcRenderer.invoke()` for requests and `ipcRenderer.on()` for events.
+桌面端使用 `ipcRenderer.invoke()` 发送请求，`ipcRenderer.on()` 接收事件。
 
-All IPC handlers are registered in `src/main/ipc.ts`. When adding new handlers:
-1. Add handler in `ipc.ts` with `ipcMain.handle()`
-2. Add corresponding method in `src/preload/index.ts`
-3. Add TypeScript type to `Api` type in preload
+所有 IPC 处理器在 `src/main/ipc.ts` 中注册。新增处理器时：
+1. 在 `ipc.ts` 中使用 `ipcMain.handle()` 添加处理器
+2. 在 `src/preload/index.ts` 中添加对应方法
+3. 在 preload 的 `Api` 类型中添加 TypeScript 类型声明
 
-### Dual-Mode API Client
+### 双模式 API 客户端
 
-The renderer API client (`src/renderer/src/api/index.ts`) supports two modes:
-- **Electron:** Uses `window.api` (IPC bridge from preload)
-- **Web:** Uses HTTP fetch + SSE for events (mobile access)
+渲染进程的 API 客户端 (`src/renderer/src/api/index.ts`) 支持两种模式：
+- **Electron:** 使用 `window.api` (preload 提供的 IPC 桥接)
+- **Web:** 使用 HTTP fetch + SSE 接收事件 (移动端访问)
 
-This allows the same UI to work in desktop app and mobile browser.
+这使得相同的 UI 既能在桌面应用中运行，也能在移动浏览器中运行。
 
-## Task Engine
+## 任务引擎
 
-The TaskEngine (`src/main/engine/taskEngine.ts`) manages async task execution:
+TaskEngine (`src/main/engine/taskEngine.ts`) 管理异步任务执行：
 
-- **Project-level serial:** Tasks in same project execute sequentially
-- **Global concurrency:** Multiple projects can run in parallel (configurable)
-- **Runners:** Pluggable execution engines (currently Claude Code CLI)
-- **State persistence:** Engine state saved across restarts
-- **Abort handling:** Tasks can be stopped mid-execution
+- **项目级串行:** 同一项目中的任务按顺序执行
+- **全局并发:** 多个项目可并行运行（可配置）
+- **运行器:** 可插拔的执行引擎（当前为 Claude Code CLI）
+- **状态持久化:** 引擎状态在重启后保留
+- **中止处理:** 任务可在执行过程中停止
 
-## Adding Features
+## 添加功能
 
-### New Database Entity
+### 新增数据库实体
 
-1. Add type to `src/shared/types.ts`
-2. Create repository in `src/main/repositories/`
-3. Add CRUD actions in `src/main/apiActions.ts`
-4. Add IPC handlers in `src/main/ipc.ts`
-5. Expose in preload `src/preload/index.ts`
-6. Add API client methods in `src/renderer/src/api/index.ts`
+1. 在 `src/shared/types.ts` 中添加类型
+2. 在 `src/main/repositories/` 中创建仓储
+3. 在 `src/main/apiActions.ts` 中添加 CRUD 操作
+4. 在 `src/main/ipc.ts` 中添加 IPC 处理器
+5. 在 `src/preload/index.ts` 中暴露接口
+6. 在 `src/renderer/src/api/index.ts` 中添加 API 客户端方法
 
-### New Task Runner
+### 新增任务运行器
 
-1. Implement `TaskRunner` interface in `src/main/engine/`
-2. Register in `src/main/engine/runnerRegistry.ts`
-3. Update `ENGINE_PROVIDER` constants in `src/shared/constants.ts`
+1. 在 `src/main/engine/` 中实现 `TaskRunner` 接口
+2. 在 `src/main/engine/runnerRegistry.ts` 中注册
+3. 更新 `src/shared/constants.ts` 中的 `ENGINE_PROVIDER` 常量
 
-## Testing
+## 测试
 
-Tests are in `src/main/**/__tests__/` and `src/renderer/**/__tests__/`.
+测试位于 `src/main/**/__tests__/` 和 `src/renderer/**/__tests__/`。
 
-Run with `npm run test` (vitest).
+使用 `npm run test` (vitest) 运行。
 
-## Build Configuration
+## 构建配置
 
-- **electron-vite.config.ts:** Vite config for main/preload/renderer
-- **tsconfig.json:** Project references (node + web)
-- **package.json:** Electron builder config for installers
+- **electron-vite.config.ts:** 主进程/预加载/渲染进程的 Vite 配置
+- **tsconfig.json:** 项目引用（node + web）
+- **package.json:** Electron builder 安装包配置
 
-The build uses `electron-vite` which bundles:
-- Main: Node.js target (no browser polyfills)
-- Preload: Isolated context
-- Renderer: Vue 3 SPA with Vite dev server
+构建使用 `electron-vite`，打包：
+- Main: Node.js 目标（无浏览器 polyfill）
+- Preload: 隔离上下文
+- Renderer: Vue 3 SPA，Vite 开发服务器

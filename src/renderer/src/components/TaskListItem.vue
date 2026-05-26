@@ -23,6 +23,8 @@ interface Props {
   hasChildren?: boolean // 是否有子任务
   isExpanded?: boolean // 是否已展开
   allTasks?: Task[] // 所有任务列表，用于检查前置任务状态
+  hasStatusInconsistency?: boolean // 是否存在状态不一致
+  statusSummary?: string // 状态摘要信息
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -207,7 +209,11 @@ function onDragEnd(e: DragEvent) {
         @click="emit('navigate', task._id)"
       >
         <span v-if="hasIncompletePrerequisites" class="prerequisite-warning-icon" title="前置任务未完成">⚠️</span>
+        <span v-if="hasStatusInconsistency" class="status-inconsistency-icon" title="父子任务状态不一致">🔄</span>
         {{ task.title }}
+        <span v-if="hasStatusInconsistency && statusSummary" class="status-summary" title="子任务状态分布">
+          ({{ statusSummary }})
+        </span>
       </RouterLink>
       <div class="task-header">
         <div class="task-badges">
@@ -347,6 +353,7 @@ function onDragEnd(e: DragEvent) {
         class="compact-title"
         @click="emit('navigate', task._id)"
       >
+        <span v-if="hasStatusInconsistency" class="status-inconsistency-icon compact">⚠️</span>
         {{ task.title }}
       </RouterLink>
       <div class="compact-meta">
@@ -509,6 +516,20 @@ function onDragEnd(e: DragEvent) {
   margin-right: var(--space-xs);
   font-size: 0.9em;
   animation: pulse 2s infinite;
+}
+
+.task-list-item .status-inconsistency-icon {
+  margin-right: var(--space-xs);
+  font-size: 0.9em;
+  animation: rotate 3s linear infinite;
+  color: #ff9f0a;
+}
+
+.task-list-item .status-summary {
+  font-size: 0.8em;
+  color: var(--color-text-secondary);
+  font-weight: normal;
+  margin-left: var(--space-xs);
 }
 
 .task-list-item .kind-badge {
@@ -1014,9 +1035,21 @@ function onDragEnd(e: DragEvent) {
   line-height: 1;
 }
 
+.task-compact-item .status-inconsistency-icon.compact {
+  margin-right: 2px;
+  font-size: 0.8em;
+  animation: rotate 3s linear infinite;
+  color: #ff9f0a;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+@keyframes rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 @media (max-width: 640px) {

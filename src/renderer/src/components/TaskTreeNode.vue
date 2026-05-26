@@ -16,6 +16,8 @@ interface Props {
   tick: number
   mode: 'comfortable' | 'compact'
   expandedIds: Set<string>
+  hasStatusInconsistency?: boolean
+  statusSummary?: string
 }
 
 const props = defineProps<Props>()
@@ -52,6 +54,8 @@ function handleTransition(taskId: string, status: TaskStatus) {
     :has-children="hasChildren"
     :is-expanded="isExpanded"
     :all-tasks="allTasks"
+    :has-status-inconsistency="hasStatusInconsistency"
+    :status-summary="statusSummary"
     @toggle="emit('toggle', $event)"
     @transition="emit('transition', task._id, $event)"
     @edit="emit('edit', task._id)"
@@ -69,6 +73,8 @@ function handleTransition(taskId: string, status: TaskStatus) {
       :tick="tick"
       :mode="mode"
       :expanded-ids="expandedIds"
+      :has-status-inconsistency="children.some(c => c.status !== child.status)"
+      :status-summary="children.length > 1 ? '' : undefined"
       @toggle="emit('toggle', $event)"
       @transition="handleTransition"
       @edit="emit('edit', $event)"

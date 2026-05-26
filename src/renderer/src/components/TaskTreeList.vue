@@ -64,21 +64,113 @@ function toggleGroup(status: TaskStatus) {
   collapsedGroups.value = next
 }
 
+// 计算任务树的综合状态，考虑子任务状态
+function getTreeStatus(task: Task, allTasks: Task[]): TaskStatus {
+  const children = allTasks.filter((t) => t.parentTaskId === task._id)
+
+  if (children.length === 0) {
+    return task.status
+  }
+
+  // 递归检查所有子任务
+  const childStatuses = children.map(child => getTreeStatus(child, allTasks))
+
+  // 如果有子任务状态与当前任务不同，则需要特殊处理
+  const hasDifferentStatus = childStatuses.some(status => status !== task.status)
+
+  if (hasDifferentStatus) {
+    // 优先级规则：
+    // 1. 如果有失败/停止的子任务，显示为警告状态
+    if (childStatuses.includes('failed')) return 'failed'
+    if (childStatuses.includes('stopped')) return 'stopped'
+
+    // 2. 如果所有子任务都已完成，但父任务不是，显示为进行中
+    if (childStatuses.every(s => s === 'completed' || s === 'closed')) {
+      return 'developing' // 表示正在进行最后的整合
+    }
+
+    // 3. 如果有活跃的子任务，显示最活跃的状态
+    const activeStatuses: TaskStatus[] = ['developing', 'planning', 'reviewing', 'plan_reviewing']
+    const hasActiveChild = childStatuses.some(s => activeStatuses.includes(s))
+    if (hasActiveChild) {
+      // 找到最活跃的子任务状态
+      for (const activeStatus of activeStatuses) {
+        if (childStatuses.includes(activeStatus)) {
+          return activeStatus
+        }
+      }
+    }
+  }
+
+  return task.status
+}
+
+// 检查任务树中是否存在状态不一致
+function hasStatusInconsistency(task: Task, allTasks: Task[]): boolean {
+  const children = allTasks.filter((t) => t.parentTaskId === task._id)
+
+  if (children.length === 0) return false
+
+  // 检查直接子任务的状态是否与父任务一致
+  const directChildrenHaveDifferentStatus = children.some(
+    child => child.status !== task.status
+  )
+
+  if (directChildrenHaveDifferentStatus) return true
+
+  // 递归检查子任务树
+  return children.some(child => hasStatusInconsistency(child, allTasks))
+}
+
+// 获取任务树的状态摘要（用于显示）
+function getStatusSummary(task: Task, allTasks: Task[]): string {
+  const descendants = getAllDescendants(task, allTasks)
+  if (descendants.length === 0) return ''
+
+  // 统计各状态的数量
+  const statusCounts = new Map<TaskStatus, number>()
+  descendants.forEach(descendant => {
+    statusCounts.set(descendant.status, (statusCounts.get(descendant.status) || 0) + 1)
+  })
+
+  // 生成摘要文本
+  const summaryParts: string[] = []
+  statusCounts.forEach((count, status) => {
+    summaryParts.push(`${STATUS_LABEL[status]} ${count}`)
+  })
+
+  return summaryParts.join(', ')
+}
+
+// 获取所有后代任务
+function getAllDescendants(task: Task, allTasks: Task[]): Task[] {
+  const children = allTasks.filter((t) => t.parentTaskId === task._id)
+  const descendants = [...children]
+
+  children.forEach(child => {
+    descendants.push(...getAllDescendants(child, allTasks))
+  })
+
+  return descendants
+}
+
 const groupedRoots = computed(() => {
   // 先找出所有顶层任务（没有 parentTaskId 的）
   const rootTasks = props.tasks.filter((t) => !t.parentTaskId)
 
-  // 按状态分组
+  // 按状态分组 - 使用树的综合状态
   const groups = new Map<TaskStatus, Task[]>()
   STATUS_ORDER.forEach((s) => groups.set(s, []))
 
   rootTasks.forEach((t) => {
-    const list = groups.get(t.status)
+    // 使用树的综合状态进行分组
+    const treeStatus = getTreeStatus(t, props.tasks)
+    const list = groups.get(treeStatus)
     if (list) {
       list.push(t)
     } else {
       // 未知状态，放入最后一个组或忽略
-      groups.set(t.status, [t])
+      groups.set(treeStatus, [t])
     }
   })
 
@@ -142,6 +234,8 @@ function handleTransition(taskId: string, status: TaskStatus) {
             :tick="tick"
             :mode="mode"
             :expanded-ids="expandedIds"
+            :has-status-inconsistency="hasStatusInconsistency(task, tasks)"
+            :status-summary="getStatusSummary(task, tasks)"
             @toggle="toggleExpand"
             @transition="handleTransition"
             @edit="emit('edit', $event)"
