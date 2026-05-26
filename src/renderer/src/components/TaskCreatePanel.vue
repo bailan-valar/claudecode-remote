@@ -8,6 +8,7 @@ const props = defineProps<{
   tasks?: Task[]
   defaultProjectId?: string
   defaultParentTaskId?: string
+  defaultPrerequisiteTaskIds?: string[]
   title?: string
 }>()
 
@@ -46,6 +47,7 @@ function handleCancel() {
             mode="create"
             :default-project-id="defaultProjectId"
             :default-parent-task-id="defaultParentTaskId"
+            :default-prerequisite-task-ids="defaultPrerequisiteTaskIds"
             @submit="handleSubmit"
             @cancel="handleCancel"
           />

@@ -153,6 +153,7 @@ const emit = defineEmits<{
   dragend: [e: DragEvent]
   toggle: [taskId: string]
   addSubtask: [taskId: string]
+  addPostTask: [taskId: string]
 }>()
 
 function onStatusTransition(status: TaskStatus) {
@@ -264,6 +265,7 @@ function onDragEnd(e: DragEvent) {
             @delete="emit('delete', $event); closeDropdown()"
             @toggle-submenu="showStatusSubmenu = $event"
             @close="closeDropdown()"
+            @add-post-task="emit('addPostTask', $event); closeDropdown()"
           />
         </div>
 
@@ -324,6 +326,7 @@ function onDragEnd(e: DragEvent) {
           @delete="emit('delete', $event); closeDropdown()"
           @toggle-submenu="showStatusSubmenu = $event"
           @close="closeDropdown()"
+          @add-post-task="emit('addPostTask', $event); closeDropdown()"
         />
       </div>
     </div>
@@ -388,6 +391,7 @@ function onDragEnd(e: DragEvent) {
           @delete="emit('delete', $event); closeDropdown()"
           @toggle-submenu="showStatusSubmenu = $event"
           @close="closeDropdown()"
+          @add-post-task="emit('addPostTask', $event); closeDropdown()"
         />
       </div>
     </div>

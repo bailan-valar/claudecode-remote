@@ -17,7 +17,7 @@ const isMobile = ref(false)
 // 悬浮按钮点击事件处理
 function handleFloatingButtonClick() {
   // 根据不同页面处理不同的逻辑
-  if (route.path === '/tasks' || route.path.startsWith('/projects/')) {
+  if (route.path === '/tasks' || route.path.startsWith('/tasks/') || route.path.startsWith('/projects/')) {
     // 任务页面和项目详情页：打开创建任务面板
     window.dispatchEvent(new CustomEvent('open-task-create'))
   } else if (route.path === '/') {

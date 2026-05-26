@@ -73,6 +73,11 @@ const showAppendPanel = ref(false)
 
 // 新增子任务
 const showSubtaskPanel = ref(false)
+
+// 新增后置任务
+const showPostTaskPanel = ref(false)
+const postTaskPrerequisiteId = ref<string | null>(null)
+
 const showPlanFullscreen = ref(false)
 
 // 更多下拉菜单
@@ -364,6 +369,22 @@ async function handleCreateSubtask(changes?: Partial<Task>) {
   await taskStore.fetch()
 }
 
+// ── 新增后置任务 ──
+function handleAddPostTask(taskId: string) {
+  const currentTask = taskStore.tasks.find((t) => t._id === taskId)
+  if (currentTask) {
+    postTaskPrerequisiteId.value = taskId
+    showPostTaskPanel.value = true
+  }
+}
+
+async function handleCreatePostTask(changes?: Partial<Task>) {
+  // 后置任务创建完成，刷新列表
+  showPostTaskPanel.value = false
+  postTaskPrerequisiteId.value = null
+  await taskStore.fetch()
+}
+
 // ── 子任务操作 ──
 function openEditDialog(taskId: string) {
   const t = taskStore.tasks.find((x) => x._id === taskId)
@@ -548,6 +569,18 @@ watch(() => task.value?.logs, () => {
       @cancel="showSubtaskPanel = false"
     />
 
+    <!-- 新建后置任务弹框 -->
+    <TaskCreatePanel
+      v-model:visible="showPostTaskPanel"
+      :projects="projectStore.projects"
+      :tasks="taskStore.tasks"
+      :default-project-id="postTaskPrerequisiteId ? (taskStore.tasks.find((t) => t._id === postTaskPrerequisiteId)?.projectId ?? '') : ''"
+      :default-prerequisite-task-ids="postTaskPrerequisiteId ? [postTaskPrerequisiteId] : undefined"
+      title="新增后置任务"
+      @submit="handleCreatePostTask"
+      @cancel="showPostTaskPanel = false; postTaskPrerequisiteId = null"
+    />
+
     <!-- 顶部 Tab -->
     <div class="tabs-bar">
       <button :class="['tab-button', { active: activeTab === 'detail' }]" @click="activeTab = 'detail'">详情</button>
@@ -670,6 +703,7 @@ watch(() => task.value?.logs, () => {
           :all-tasks="taskStore.tasks"
           @edit="openEditDialog($event)"
           @delete="deletingChildTaskId = $event"
+          @add-post-task="handleAddPostTask($event)"
         />
       </ul>
     </section>

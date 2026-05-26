@@ -21,6 +21,7 @@ const emit = defineEmits<{
   edit: [taskId: string]
   delete: [taskId: string]
   addSubtask: [taskId: string]
+  addPostTask: [taskId: string]
 }>()
 
 // 状态展示顺序
@@ -241,6 +242,7 @@ function handleTransition(taskId: string, status: TaskStatus) {
             @edit="emit('edit', $event)"
             @delete="emit('delete', $event)"
             @add-subtask="emit('addSubtask', $event)"
+            @add-post-task="emit('addPostTask', $event)"
           />
         </ul>
       </div>

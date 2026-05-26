@@ -37,6 +37,7 @@ const tick = ref(0)
 const llmProviders = ref<LlmProvider[]>([])
 const taskViewMode = ref<'list' | 'kanban'>('list')
 const subtaskParentId = ref<string | null>(null)
+const postTaskPrerequisiteId = ref<string | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
 
 // 新增项目列表相关状态
@@ -195,6 +196,7 @@ async function handleDelete() {
 async function handleTaskCreated() {
   showCreateTask.value = false
   subtaskParentId.value = null
+  postTaskPrerequisiteId.value = null
   await taskStore.fetch(projectId)
 }
 
@@ -221,6 +223,16 @@ function handleAddSubtask(taskId: string) {
   const task = taskStore.tasks.find((t) => t._id === taskId)
   if (task) {
     subtaskParentId.value = taskId
+    postTaskPrerequisiteId.value = null
+    showCreateTask.value = true
+  }
+}
+
+function handleAddPostTask(taskId: string) {
+  const task = taskStore.tasks.find((t) => t._id === taskId)
+  if (task) {
+    subtaskParentId.value = null
+    postTaskPrerequisiteId.value = taskId
     showCreateTask.value = true
   }
 }
@@ -776,11 +788,12 @@ async function handleGitPush() {
           v-model:visible="showCreateTask"
           :projects="project ? [project] : []"
           :tasks="sortedTasks"
-          :default-project-id="subtaskParentId ? (taskStore.tasks.find((t) => t._id === subtaskParentId)?.projectId ?? projectId) : projectId"
+          :default-project-id="subtaskParentId ? (taskStore.tasks.find((t) => t._id === subtaskParentId)?.projectId ?? projectId) : (postTaskPrerequisiteId ? (taskStore.tasks.find((t) => t._id === postTaskPrerequisiteId)?.projectId ?? projectId) : projectId)"
           :default-parent-task-id="subtaskParentId ?? undefined"
-          :title="subtaskParentId ? '添加子任务' : '新建任务'"
+          :default-prerequisite-task-ids="postTaskPrerequisiteId ? [postTaskPrerequisiteId] : undefined"
+          :title="subtaskParentId ? '添加子任务' : (postTaskPrerequisiteId ? '新增后置任务' : '新建任务')"
           @submit="handleTaskCreated"
-          @cancel="showCreateTask = false; subtaskParentId = null"
+          @cancel="showCreateTask = false; subtaskParentId = null; postTaskPrerequisiteId = null"
         />
 
         <div v-if="sortedTasks.length">
@@ -795,6 +808,7 @@ async function handleGitPush() {
             @edit="handleTaskEdit"
             @delete="deletingTaskId = $event"
             @add-subtask="handleAddSubtask"
+            @add-post-task="handleAddPostTask"
           />
 
           <!-- 看板视图 -->
@@ -807,6 +821,7 @@ async function handleGitPush() {
             @edit="handleTaskEdit"
             @delete="deletingTaskId = $event"
             @add-subtask="handleAddSubtask"
+            @add-post-task="handleAddPostTask"
           />
         </div>
         <p v-else class="empty">该项目暂无任务</p>

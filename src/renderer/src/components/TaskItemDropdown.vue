@@ -26,6 +26,7 @@ const emit = defineEmits<{
   close: []
   append: []
   createSubtask: [taskId: string]
+  addPostTask: [taskId: string]
 }>()
 
 // 延迟隐藏菜单的定时器
@@ -123,6 +124,11 @@ function onCreateSubtask() {
   emit('close')
 }
 
+function onAddPostTask() {
+  emit('addPostTask', props.task._id)
+  emit('close')
+}
+
 // 组件卸载时清理定时器
 onUnmounted(() => {
   clearHideTimer()
@@ -166,6 +172,10 @@ onUnmounted(() => {
       <button v-else class="dropdown-item" @click="onAddSubtask">
         <span class="dropdown-icon">➕</span>
         添加子任务
+      </button>
+      <button class="dropdown-item" @click="onAddPostTask">
+        <span class="dropdown-icon">⏭️</span>
+        新增后置任务
       </button>
       <div class="dropdown-divider"></div>
       <button class="dropdown-item danger" @click="onDelete">

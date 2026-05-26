@@ -28,6 +28,7 @@ const emit = defineEmits<{
   edit: [taskId: string]
   delete: [taskId: string]
   addSubtask: [taskId: string]
+  addPostTask: [taskId: string]
 }>()
 
 const children = computed(() => {
@@ -61,6 +62,7 @@ function handleTransition(taskId: string, status: TaskStatus) {
     @edit="emit('edit', task._id)"
     @delete="emit('delete', task._id)"
     @add-subtask="emit('addSubtask', task._id)"
+    @add-post-task="emit('addPostTask', task._id)"
   />
   <template v-if="hasChildren && isExpanded">
     <TaskTreeNode
@@ -80,6 +82,7 @@ function handleTransition(taskId: string, status: TaskStatus) {
       @edit="emit('edit', $event)"
       @delete="emit('delete', $event)"
       @add-subtask="emit('addSubtask', $event)"
+      @add-post-task="emit('addPostTask', $event)"
     />
   </template>
 </template>

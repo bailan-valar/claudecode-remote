@@ -29,9 +29,11 @@ const editingTask = ref<Task | undefined>(undefined)
 const viewMode = ref<'list' | 'kanban'>('list')
 const listDensity = ref<'comfortable' | 'compact'>('compact')
 const subtaskParentId = ref<string | null>(null)
+const postTaskPrerequisiteId = ref<string | null>(null)
 
 function openCreateForm() {
   subtaskParentId.value = null
+  postTaskPrerequisiteId.value = null
   showForm.value = true
 }
 
@@ -39,6 +41,16 @@ function handleAddSubtask(taskId: string) {
   const task = taskStore.tasks.find((t) => t._id === taskId)
   if (task) {
     subtaskParentId.value = taskId
+    postTaskPrerequisiteId.value = null
+    showForm.value = true
+  }
+}
+
+function handleAddPostTask(taskId: string) {
+  const task = taskStore.tasks.find((t) => t._id === taskId)
+  if (task) {
+    subtaskParentId.value = null
+    postTaskPrerequisiteId.value = taskId
     showForm.value = true
   }
 }
@@ -180,11 +192,12 @@ onUnmounted(() => {
       v-model:visible="showForm"
       :projects="projectStore.projects"
       :tasks="taskStore.tasks"
-      :default-project-id="subtaskParentId ? (taskStore.tasks.find((t) => t._id === subtaskParentId)?.projectId ?? '') : ''"
+      :default-project-id="subtaskParentId ? (taskStore.tasks.find((t) => t._id === subtaskParentId)?.projectId ?? '') : (postTaskPrerequisiteId ? (taskStore.tasks.find((t) => t._id === postTaskPrerequisiteId)?.projectId ?? '') : '')"
       :default-parent-task-id="subtaskParentId ?? undefined"
-      :title="subtaskParentId ? '添加子任务' : '新建任务'"
-      @submit="showForm = false; subtaskParentId = null"
-      @cancel="showForm = false; subtaskParentId = null"
+      :default-prerequisite-task-ids="postTaskPrerequisiteId ? [postTaskPrerequisiteId] : undefined"
+      :title="subtaskParentId ? '添加子任务' : (postTaskPrerequisiteId ? '新增后置任务' : '新建任务')"
+      @submit="showForm = false; subtaskParentId = null; postTaskPrerequisiteId = null"
+      @cancel="showForm = false; subtaskParentId = null; postTaskPrerequisiteId = null"
     />
 
     <div class="filters-bar">
@@ -210,6 +223,7 @@ onUnmounted(() => {
         @edit="openEditDialog($event)"
         @delete="deletingTaskId = $event"
         @add-subtask="handleAddSubtask"
+        @add-post-task="handleAddPostTask"
       />
       <TaskTreeList
         v-else
@@ -221,6 +235,7 @@ onUnmounted(() => {
         @edit="openEditDialog($event)"
         @delete="deletingTaskId = $event"
         @add-subtask="handleAddSubtask"
+        @add-post-task="handleAddPostTask"
       />
     </template>
 
