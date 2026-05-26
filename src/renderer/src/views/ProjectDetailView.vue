@@ -446,6 +446,7 @@ interface TerminalCommand {
 const terminalCommands = ref<TerminalCommand[]>([])
 const terminalInput = ref('')
 const terminalLoading = ref(false)
+const gitPushLoading = ref(false)
 const terminalContainerRef = ref<HTMLElement | null>(null)
 
 function scrollTerminalToBottom() {
@@ -501,6 +502,48 @@ async function handleExecuteCommand() {
 
 function clearTerminal() {
   terminalCommands.value = []
+}
+
+async function handleGitPush() {
+  if (!project.value || gitPushLoading.value) return
+
+  gitPushLoading.value = true
+
+  try {
+    const result = await apiClient.gitPush(project.value._id)
+
+    // 将推送结果显示到终端
+    const cmdId = Date.now().toString()
+    terminalCommands.value.push({
+      id: cmdId,
+      command: 'git push',
+      output: result.message || '',
+      error: result.error || '',
+      exitCode: result.success ? 0 : 1,
+      duration: 0,
+      timestamp: new Date().toISOString(),
+    })
+
+    // 如果成功且有待推送的提交，显示详细信息
+    if (result.success && result.pushedCommits && result.pushedCommits.length > 0) {
+      terminalCommands.value[terminalCommands.value.length - 1].output +=
+        '\n已推送的提交:\n' + result.pushedCommits.join('\n')
+    }
+  } catch (err: any) {
+    const cmdId = Date.now().toString()
+    terminalCommands.value.push({
+      id: cmdId,
+      command: 'git push',
+      output: '',
+      error: err.message || '推送失败',
+      exitCode: -1,
+      duration: 0,
+      timestamp: new Date().toISOString(),
+    })
+  } finally {
+    gitPushLoading.value = false
+    scrollTerminalToBottom()
+  }
 }
 
 onMounted(() => {
@@ -819,7 +862,16 @@ onUnmounted(() => {
       <!-- 终端 -->
       <section v-show="activeTab === 'terminal'" class="terminal">
         <div class="terminal-toolbar">
-          <button class="glass-button" @click="clearTerminal">清空终端</button>
+          <div class="terminal-toolbar-actions">
+            <button class="glass-button" @click="clearTerminal">清空终端</button>
+            <button
+              class="glass-button primary"
+              :disabled="gitPushLoading"
+              @click="handleGitPush"
+            >
+              {{ gitPushLoading ? '推送中…' : 'Git 推送' }}
+            </button>
+          </div>
           <span v-if="project" class="terminal-path">{{ project.path }}</span>
         </div>
         <div ref="terminalContainerRef" class="terminal-container glass">
@@ -1428,6 +1480,11 @@ header .actions {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-md);
+}
+
+.terminal-toolbar-actions {
+  display: flex;
+  gap: var(--space-sm);
 }
 
 .terminal-path {

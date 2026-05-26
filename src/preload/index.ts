@@ -133,6 +133,10 @@ const api = {
   executeTerminalCommand: (projectId: string, command: string, workingDir?: string) =>
     ipcRenderer.invoke('terminal:execute', projectId, command, workingDir),
 
+  // === Git Push ===
+  gitPush: (projectId: string, remote?: string, branch?: string) =>
+    ipcRenderer.invoke('git:push', projectId, remote, branch),
+
   // === Webhook ===
   testWebhook: (webhookUrl: string) => ipcRenderer.invoke('webhook:test', webhookUrl),
 

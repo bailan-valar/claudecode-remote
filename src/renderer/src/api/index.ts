@@ -178,6 +178,9 @@ const httpApi: Api = {
   executeTerminalCommand: (projectId, command, workingDir?) =>
     httpInvoke('POST', '/api/terminal/execute', { projectId, command, workingDir }),
 
+  gitPush: (projectId, remote?, branch?) =>
+    httpInvoke('POST', '/api/git/push', { projectId, remote, branch }),
+
   exportData: () => httpInvoke('GET', '/api/data/export'),
   importData: (data, options?) => httpInvoke('POST', '/api/data/import', { data, options }),
 

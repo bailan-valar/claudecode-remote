@@ -30,6 +30,8 @@ npm run format       # Prettier formatting
 npm run test         # Run tests (vitest)
 ```
 
+> **注意：** 不要自动运行任何 `npm run` 构建脚本（如 `npm run build`、`npm run build:win` 等）。仅在用户明确要求时，才手动执行相关命令。
+
 ## Environment Setup
 
 Copy `.env.example` to `.env` and configure:

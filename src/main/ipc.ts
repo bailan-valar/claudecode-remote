@@ -182,6 +182,12 @@ export function registerIpcHandlers(win: BrowserWindow) {
     return api.executeTerminalCommandAction(projectId, command, workingDir)
   })
 
+  // --- Git Push handlers ---
+  ipcMain.removeHandler('git:push')
+  ipcMain.handle('git:push', async (_, projectId: string, remote?: string, branch?: string) => {
+    return api.gitPushAction(projectId, remote, branch)
+  })
+
   // --- Data Export/Import handlers ---
   ipcMain.removeHandler('data:export')
   ipcMain.handle('data:export', async () => {

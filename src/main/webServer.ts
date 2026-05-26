@@ -312,6 +312,13 @@ export function startWebServer(): void {
           return
         }
 
+        // Git Push
+        if (pathname === '/api/git/push' && req.method === 'POST') {
+          const result = await api.gitPushAction(body.projectId, body.remote, body.branch)
+          sendJson(res, 200, result)
+          return
+        }
+
         // Data Export/Import
         if (pathname === '/api/data/export' && req.method === 'GET') {
           const result = await api.exportDataAction()

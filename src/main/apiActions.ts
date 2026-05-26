@@ -15,6 +15,7 @@ import type { TimeEntry } from './utils/taskTimeTracking'
 import { broadcast } from './events'
 import { sendWecomMessage, buildTestMessage } from './engine/wecomNotifier'
 import { runClaudeChat } from './engine/claudeRunner'
+import { pushToRemote } from './engine/gitAutoCommit'
 import type { Project, Task, ChatMessage } from '../shared/types'
 import type { LogEntry } from './engine/runner'
 
@@ -689,5 +690,28 @@ export async function getInstanceInfoAction() {
     ok: true,
     instanceId,
     localDbName,
+  }
+}
+
+// === Git Push ===
+
+export async function gitPushAction(projectId: string, remote?: string, branch?: string) {
+  console.log('[api] git:push', projectId, remote, branch)
+
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
+
+  const repo = createProjectRepository(db)
+  const project = await repo.findById(projectId)
+  if (!project) return { ok: false, error: '项目不存在' }
+  if (!project.path) return { ok: false, error: '项目路径未配置' }
+
+  try {
+    const result = await pushToRemote(project.path, remote, branch)
+    console.log('[api] git:push', result.success ? 'ok' : 'failed:', result.message || result.error)
+    return result
+  } catch (err: any) {
+    console.error('[api] git:push error:', err.message)
+    return { ok: false, error: err.message || '推送失败' }
   }
 }
