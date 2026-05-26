@@ -186,9 +186,14 @@ function runClaudeTask(
   options?: RunOptions,
 ): Promise<RunResult> {
   // 构建提示词：标题 + 描述
-  const combinedPrompt = task.description
+  let combinedPrompt = task.description
     ? `${task.title}\n\n${task.description}`
     : task.title
+
+  // 如果是基于已有 session 恢复执行，且带有继续提示（如孤儿任务回收），追加到 prompt
+  if (task.claudeSessionId && task.reviewFeedback) {
+    combinedPrompt += `\n\n${task.reviewFeedback}`
+  }
 
   return runClaude({
     project,

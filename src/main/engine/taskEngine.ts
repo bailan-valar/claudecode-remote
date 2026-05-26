@@ -124,7 +124,10 @@ export class TaskEngine extends EventEmitter {
     this._running = true
     console.log('[engine] started')
 
-    this._scanPending()
+    // 先回收长时间未更新的孤儿任务，再扫描 pending，避免遗漏
+    this._recoverStaleTasks().then(() => {
+      this._scanPending()
+    })
 
     this.changesFeed = this.db
       .changes({ live: true, since: 'now', include_docs: true })
@@ -241,6 +244,47 @@ export class TaskEngine extends EventEmitter {
     console.log(`[engine] scanning pending tasks: found ${pending.length} tasks to enqueue`)
     for (const task of pending) {
       this._enqueue(task)
+    }
+  }
+
+  /**
+   * 回收长时间未更新的孤儿任务。
+   * 应用在执行中崩溃/退出时，任务可能永远停留在 developing/planning。
+   * 将其重置为 pending 并追加 "继续" 提示，利用 --resume 恢复上下文。
+   */
+  private async _recoverStaleTasks(): Promise<void> {
+    const STALE_THRESHOLD_MS = 5 * 60 * 1000 // 5 分钟
+    const taskRepo = createTaskRepository(this.db)
+    const tasks = await taskRepo.findAll()
+    const now = Date.now()
+
+    for (const task of tasks) {
+      if (task.status !== TASK_STATUS.DEVELOPING && task.status !== TASK_STATUS.PLANNING) {
+        continue
+      }
+
+      const lastUpdate = new Date(task.updatedAt).getTime()
+      if (now - lastUpdate < STALE_THRESHOLD_MS) {
+        continue
+      }
+
+      // 防御性检查：避免与当前真正在运行的任务冲突
+      if (this.runningTasks.has(task._id)) {
+        continue
+      }
+
+      console.log(`[engine] recovering stale task ${task._id}, last update: ${task.updatedAt}, status: ${task.status}`)
+
+      try {
+        await taskRepo.update(task._id, {
+          status: TASK_STATUS.PENDING,
+          reviewFeedback: '继续',
+          updatedAt: new Date().toISOString(),
+        })
+        console.log(`[engine] stale task ${task._id} recovered to pending`)
+      } catch (err: any) {
+        console.error(`[engine] failed to recover stale task ${task._id}:`, err.message)
+      }
     }
   }
 
