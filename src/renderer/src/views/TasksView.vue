@@ -117,10 +117,16 @@ onMounted(() => {
   taskStore.fetch()
   projectStore.fetch()
   startTick()
+
+  // 监听悬浮按钮的点击事件
+  window.addEventListener('open-task-create', openCreateForm)
 })
 
 onUnmounted(() => {
   stopTick()
+
+  // 移除事件监听
+  window.removeEventListener('open-task-create', openCreateForm)
 })
 </script>
 

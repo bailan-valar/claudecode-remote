@@ -47,7 +47,7 @@ let refreshTimerId: ReturnType<typeof setInterval> | null = null
 // SSE事件监听器取消函数
 let unsubscribeLogsUpdated: (() => void) | null = null
 
-// 控制是否隐藏工具调用（从本地存储读取偏好）
+// 控制是否隐藏工具调用及结果（从本地存储读取偏好）
 const hideToolCalls = ref(localStorage.getItem('hideToolCalls') === 'true')
 
 // 监听变化，保存到本地存储
@@ -55,7 +55,7 @@ watch(hideToolCalls, (newValue) => {
   localStorage.setItem('hideToolCalls', String(newValue))
 })
 
-// 计算被隐藏的工具调用数量
+// 计算被隐藏的工具调用和工具结果数量
 function getHiddenToolCallsCount(phase: StatusHistoryEntry) {
   if (!task.value || !hideToolCalls.value) return 0
   const start = new Date(phase.startedAt).getTime()
@@ -63,7 +63,7 @@ function getHiddenToolCallsCount(phase: StatusHistoryEntry) {
   return task.value.logs.filter((log) => {
     const t = new Date(log.timestamp).getTime()
     const inTimeRange = t >= start && t <= end
-    const isToolCall = log.message.trim().startsWith('[工具]')
+    const isToolCall = log.message.trim().startsWith('[工具]') || log.message.trim().startsWith('[工具结果]')
     return inTimeRange && isToolCall
   }).length
 }
@@ -191,8 +191,11 @@ function getPhaseLogs(phase: StatusHistoryEntry) {
   return task.value.logs.filter((log) => {
     const t = new Date(log.timestamp).getTime()
     const inTimeRange = t >= start && t <= end
-    // 如果启用了隐藏工具调用，过滤掉以"[工具]"开头的日志
-    const notToolCall = !hideToolCalls.value || !log.message.trim().startsWith('[工具]')
+    // 如果启用了隐藏工具调用及结果，过滤掉工具调用和工具结果
+    const notToolCall = !hideToolCalls.value || (
+      !log.message.trim().startsWith('[工具]') &&
+      !log.message.trim().startsWith('[工具结果]')
+    )
     return inTimeRange && notToolCall
   })
 }
@@ -378,6 +381,11 @@ function scrollLogsToBottom() {
   })
 }
 
+// 返回上一页
+function goBack() {
+  router.back()
+}
+
 // ── 监听tab切换、阶段选择和日志变化，自动滚动到底部 ──
 watch([activeTab, selectedPhaseIndex, () => selectedPhase.value?.status], () => {
   if (activeTab.value === 'logs') {
@@ -408,6 +416,9 @@ watch(() => task.value?.logs, () => {
     </div>
     <header>
       <div class="header-left">
+        <button class="glass-button btn-back" @click="goBack" title="返回">
+          <span class="back-icon">←</span>
+        </button>
         <template v-if="!isEditingStatus">
           <StatusBadge :status="task.status" class="status-editable" @click="startEditStatus()" />
         </template>
@@ -611,7 +622,7 @@ watch(() => task.value?.logs, () => {
 	                <span class="content-label">{{ selectedPhase.status === 'planning' ? '计划执行日志' : '开发日志' }}</span>
 	                <label class="tool-call-filter">
 	                  <input type="checkbox" v-model="hideToolCalls" />
-	                  <span>隐藏工具调用</span>
+	                  <span>隐藏工具调用及结果</span>
 	                  <span v-if="hideToolCalls && getHiddenToolCallsCount(selectedPhase) > 0" class="hidden-count">
 	                    (已隐藏 {{ getHiddenToolCallsCount(selectedPhase) }} 条)
 	                  </span>
@@ -703,6 +714,23 @@ header {
   gap: var(--space-sm);
   flex: 1;
   min-width: 0;
+}
+
+.btn-back {
+  min-height: 36px;
+  min-width: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.back-icon {
+  font-size: 1.125rem;
+  font-weight: bold;
+  line-height: 1;
 }
 
 header .page-title {

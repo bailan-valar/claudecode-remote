@@ -1,12 +1,30 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
 import { useEngineStore } from './stores/useEngineStore'
-import { useRoute } from 'vue-router'
+import { useTaskStore } from './stores/useTaskStore'
+import { useProjectStore } from './stores/useProjectStore'
+import { useRoute, useRouter } from 'vue-router'
 import { getGlobalKeepAliveManager } from './utils/keepAliveManager'
+import FloatingButton from './components/FloatingButton.vue'
 
 const engineStore = useEngineStore() // 确保引擎store全局初始化
+const taskStore = useTaskStore()
+const projectStore = useProjectStore()
 const route = useRoute()
+const router = useRouter()
 const isMobile = ref(false)
+
+// 悬浮按钮点击事件处理
+function handleFloatingButtonClick() {
+  // 检查当前路由，如果是任务页面，则触发全局事件打开创建面板
+  if (route.path === '/tasks') {
+    // 发射一个自定义事件，由TasksView监听
+    window.dispatchEvent(new CustomEvent('open-task-create'))
+  } else if (route.path.startsWith('/project/')) {
+    // 如果是项目详情页，也可以创建任务
+    window.dispatchEvent(new CustomEvent('open-task-create'))
+  }
+}
 
 // 初始化 keep-alive 管理器
 const keepAliveManager = getGlobalKeepAliveManager()
@@ -98,6 +116,9 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
           <span class="mobile-label">设置</span>
         </RouterLink>
       </nav>
+
+      <!-- 悬浮按钮 -->
+      <FloatingButton @click="handleFloatingButtonClick" />
   </div>
 </template>
 

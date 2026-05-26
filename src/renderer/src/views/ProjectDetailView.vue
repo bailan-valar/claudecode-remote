@@ -471,12 +471,18 @@ onMounted(() => {
 
   // 加载聊天历史
   loadChatHistory()
+
+  // 监听悬浮按钮的点击事件
+  window.addEventListener('open-task-create', openCreateTaskDialog)
 })
 
 onUnmounted(() => {
   stopTick()
   chatLogUnsubscribe?.()
   chatDoneUnsubscribe?.()
+
+  // 移除事件监听
+  window.removeEventListener('open-task-create', openCreateTaskDialog)
 })
 </script>
 
