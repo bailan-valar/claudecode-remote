@@ -135,6 +135,8 @@ const httpApi: Api = {
   updateTask: (id, doc) => httpInvoke('PATCH', `/api/tasks/${id}`, doc),
   deleteTask: (id) => httpInvoke('DELETE', `/api/tasks/${id}`),
   resumeTask: (id) => httpInvoke('POST', `/api/tasks/${id}/resume`),
+  stopTask: (id) => httpInvoke('POST', `/api/tasks/${id}/stop`),
+  addTaskLog: (id, message) => httpInvoke('POST', `/api/tasks/${id}/logs`, { message }),
 
   getEngineStatus: () => httpInvoke('GET', '/api/engine/status'),
   startEngine: () => httpInvoke('POST', '/api/engine/start'),

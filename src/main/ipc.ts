@@ -50,6 +50,7 @@ export function registerIpcHandlers(win: BrowserWindow) {
   mainEvents.on('engine:status', (status) => sendToWin('engine:status', status))
   mainEvents.on('engine:task:completed', (taskId, result) => sendToWin('engine:task:completed', taskId, result))
   mainEvents.on('engine:task:failed', (taskId, error) => sendToWin('engine:task:failed', taskId, error))
+  mainEvents.on('task:logs_updated', (taskId, logs) => sendToWin('engine:task:logs_updated', taskId, logs))
   mainEvents.on('task:created', (task) => sendToWin('task:created', task))
   mainEvents.on('task:updated', (task) => sendToWin('task:updated', task))
   mainEvents.on('task:deleted', (id) => sendToWin('task:deleted', id))
@@ -94,6 +95,12 @@ export function registerIpcHandlers(win: BrowserWindow) {
 
   ipcMain.removeHandler('task:resume')
   ipcMain.handle('task:resume', async (_, id: string) => api.resumeTaskAction(id))
+
+  ipcMain.removeHandler('task:stop')
+  ipcMain.handle('task:stop', async (_, id: string) => api.stopTaskAction(id))
+
+  ipcMain.removeHandler('task:addLog')
+  ipcMain.handle('task:addLog', async (_, id: string, message: string) => api.addTaskLogAction(id, message))
 
   // --- Engine handlers ---
   ipcMain.removeHandler('engine:status')

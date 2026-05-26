@@ -209,6 +209,28 @@ export async function resumeTaskAction(id: string) {
   return result
 }
 
+export async function stopTaskAction(id: string) {
+  console.log('[api] task:stop', id)
+  const engine = getEngine()
+  if (!engine) {
+    return { ok: false, error: '引擎未初始化' }
+  }
+  const result = await engine.stopTask(id)
+  console.log('[api] task:stop', result.ok ? 'ok' : 'failed:', result.error)
+  return result
+}
+
+export async function addTaskLogAction(id: string, message: string) {
+  console.log('[api] task:addLog', id, message.slice(0, 60))
+  const engine = getEngine()
+  if (!engine) {
+    return { ok: false, error: '引擎未初始化' }
+  }
+  const result = await engine.addTaskLog(id, message)
+  console.log('[api] task:addLog', result.ok ? 'ok' : 'failed:', result.error)
+  return result
+}
+
 // === Engine ===
 
 export async function getEngineStatusAction() {

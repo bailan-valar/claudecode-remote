@@ -293,6 +293,56 @@ export class TaskEngine extends EventEmitter {
     return { ok: true }
   }
 
+  /**
+   * 停止正在运行的任务
+   */
+  async stopTask(taskId: string): Promise<{ ok: boolean; error?: string }> {
+    const controller = this.runningTasks.get(taskId)
+    if (!controller) {
+      return { ok: false, error: '任务未在运行中' }
+    }
+
+    // 标记任务为已停止
+    this.stoppedTaskIds.add(taskId)
+
+    // 中止任务执行
+    controller.abort()
+
+    console.log(`[engine] stopping task ${taskId}`)
+
+    return { ok: true }
+  }
+
+  /**
+   * 手动添加日志到任务
+   */
+  async addTaskLog(taskId: string, message: string): Promise<{ ok: boolean; error?: string }> {
+    const taskRepo = createTaskRepository(this.db)
+    const task = await taskRepo.findById(taskId)
+    if (!task) {
+      return { ok: false, error: '任务不存在' }
+    }
+
+    const newLog: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      message,
+    }
+
+    const logs = [...(task.logs || []), newLog]
+
+    try {
+      await taskRepo.update(taskId, { logs })
+      // 发射日志更新事件，通知前端
+      this.emit('task:logs_updated', taskId, logs)
+      console.log(`[engine] added manual log to task ${taskId}`)
+      return { ok: true }
+    } catch (err: any) {
+      console.error(`[engine] failed to add log to task ${taskId}:`, err)
+      return { ok: false, error: err.message || '添加日志失败' }
+    }
+  }
+
   private async _scanPending(): Promise<void> {
     const taskRepo = createTaskRepository(this.db)
     const tasks = await taskRepo.findAll()
@@ -341,7 +391,6 @@ export class TaskEngine extends EventEmitter {
       try {
         await taskRepo.update(task._id, {
           status: TASK_STATUS.PENDING,
-          reviewFeedback: '继续',
           updatedAt: new Date().toISOString(),
         })
         console.log(`[engine] stale task ${task._id} recovered to pending`)

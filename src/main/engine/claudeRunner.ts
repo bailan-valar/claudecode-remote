@@ -190,9 +190,14 @@ function runClaudeTask(
     ? `${task.title}\n\n${task.description}`
     : task.title
 
-  // 如果是基于已有 session 恢复执行，且带有继续提示（如孤儿任务回收），追加到 prompt
-  if (task.claudeSessionId && task.reviewFeedback) {
+  // 追加审核/失败反馈
+  if (task.reviewFeedback) {
     combinedPrompt += `\n\n${task.reviewFeedback}`
+  }
+
+  // 如果基于已有 session 恢复执行（孤儿回收、手动恢复等），追加继续指令
+  if (task.claudeSessionId) {
+    combinedPrompt += '\n\n继续'
   }
 
   return runClaude({

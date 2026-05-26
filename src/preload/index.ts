@@ -42,6 +42,8 @@ const api = {
     ipcRenderer.invoke('task:update', id, doc),
   deleteTask: (id: string) => ipcRenderer.invoke('task:delete', id),
   resumeTask: (id: string) => ipcRenderer.invoke('task:resume', id),
+  stopTask: (id: string) => ipcRenderer.invoke('task:stop', id),
+  addTaskLog: (id: string, message: string) => ipcRenderer.invoke('task:addLog', id, message),
 
   // === Engine ===
   getEngineStatus: () => ipcRenderer.invoke('engine:status'),

@@ -214,6 +214,18 @@ export function startWebServer(): void {
           sendJson(res, 200, result)
           return
         }
+        if (pathname.startsWith('/api/tasks/') && pathname.endsWith('/stop') && req.method === 'POST') {
+          const id = pathname.slice('/api/tasks/'.length, -'/stop'.length)
+          const result = await api.stopTaskAction(id)
+          sendJson(res, 200, result)
+          return
+        }
+        if (pathname.startsWith('/api/tasks/') && pathname.endsWith('/logs') && req.method === 'POST') {
+          const id = pathname.slice('/api/tasks/'.length, -'/logs'.length)
+          const result = await api.addTaskLogAction(id, body.message)
+          sendJson(res, 200, result)
+          return
+        }
 
         // Engine
         if (pathname === '/api/engine/status' && req.method === 'GET') {

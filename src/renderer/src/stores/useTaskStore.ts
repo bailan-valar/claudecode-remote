@@ -90,5 +90,15 @@ export const useTaskStore = defineStore('task', () => {
     return result
   }
 
-  return { tasks, isLoading, currentProjectId, filteredTasks, stats, fetch, create, update, updateStatus, remove, resume }
+  async function stopTask(id: string) {
+    const result = await apiClient.stopTask(id)
+    return result
+  }
+
+  async function addTaskLog(id: string, message: string) {
+    const result = await apiClient.addTaskLog(id, message)
+    return result
+  }
+
+  return { tasks, isLoading, currentProjectId, filteredTasks, stats, fetch, create, update, updateStatus, remove, resume, stopTask, addTaskLog }
 })

@@ -126,6 +126,22 @@ const canResume = computed(() => {
   return hasSessionId && isPendingOrPlanRequired && wasStopped
 })
 
+// 停止运行
+const isStopping = ref(false)
+
+// 判断任务是否正在运行（可以停止）
+const canStop = computed(() => {
+  if (!task.value) return false
+  return isTracking(task.value) && (
+    task.value.status === TASK_STATUS.DEVELOPING ||
+    task.value.status === TASK_STATUS.PLANNING
+  )
+})
+
+// 手动发送新内容
+const manualLogContent = ref('')
+const isSendingLog = ref(false)
+
 const childTasks = computed(() => {
   if (!task.value) return []
   return taskStore.tasks
@@ -281,7 +297,7 @@ onMounted(() => {
   }, 30000)
 
   // 监听SSE日志更新事件（主要更新机制）
-  unsubscribeLogsUpdated = apiClient.onEngineTaskLogsUpdated((updatedTaskId: string) => {
+  unsubscribeLogsUpdated = apiClient.onEngineTaskLogsUpdated((updatedTaskId: string, logs: any[]) => {
     // 如果是当前任务，立即刷新数据
     if (updatedTaskId === taskId) {
       taskStore.fetch()
@@ -386,6 +402,44 @@ async function handleResume() {
     }
   } finally {
     isResuming.value = false
+  }
+}
+
+// ── 停止运行 ──
+async function handleStop() {
+  if (!task.value) return
+  if (!confirm('确定要停止当前任务的运行吗？')) return
+
+  isStopping.value = true
+  try {
+    const result = await taskStore.stopTask(task.value._id)
+    if (result.ok) {
+      // 刷新任务数据
+      await taskStore.fetch()
+    } else {
+      alert(result.error || '停止运行失败')
+    }
+  } finally {
+    isStopping.value = false
+  }
+}
+
+// ── 手动发送新内容 ──
+async function handleSendLog() {
+  if (!task.value || !manualLogContent.value.trim()) return
+
+  isSendingLog.value = true
+  try {
+    const result = await taskStore.addTaskLog(task.value._id, manualLogContent.value.trim())
+    if (result.ok) {
+      manualLogContent.value = ''
+      // 刷新任务数据以显示新日志
+      await taskStore.fetch()
+    } else {
+      alert(result.error || '发送日志失败')
+    }
+  } finally {
+    isSendingLog.value = false
   }
 }
 
@@ -677,6 +731,37 @@ watch(() => task.value?.logs, () => {
                 </div>
               </div>
               <div v-else class="content-empty">暂无日志</div>
+
+              <!-- 控制按钮区域 -->
+              <div class="log-controls">
+                <button
+                  v-if="canStop"
+                  class="glass-button btn-stop"
+                  @click="handleStop"
+                  :disabled="isStopping"
+                  title="停止当前任务的运行"
+                >
+                  {{ isStopping ? '停止中...' : '⏹ 停止运行' }}
+                </button>
+
+                <!-- 手动发送新内容 -->
+                <div class="manual-log-control">
+                  <input
+                    type="text"
+                    v-model="manualLogContent"
+                    class="glass-input manual-log-input"
+                    placeholder="手动添加日志内容..."
+                    @keypress.enter="handleSendLog"
+                  />
+                  <button
+                    class="glass-button btn-send-log"
+                    @click="handleSendLog"
+                    :disabled="isSendingLog || !manualLogContent.trim()"
+                  >
+                    {{ isSendingLog ? '发送中...' : '发送' }}
+                  </button>
+                </div>
+              </div>
             </template>
 
             <template v-else-if="selectedPhase.status === 'plan_reviewing'">
@@ -1344,6 +1429,75 @@ header .more-icon {
 
   .resume-text {
     justify-content: center;
+  }
+}
+
+/* ── 日志控制区域 ── */
+.log-controls {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--glass-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.log-controls .glass-button.btn-stop {
+  align-self: flex-start;
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  border-color: rgba(255, 59, 48, 0.3);
+  font-weight: 600;
+}
+
+.log-controls .glass-button.btn-stop:hover {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: rgba(255, 59, 48, 0.5);
+}
+
+.log-controls .glass-button.btn-stop:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.manual-log-control {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.manual-log-input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+}
+
+.manual-log-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.btn-send-log {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-send-log:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .manual-log-control {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-send-log {
+    width: 100%;
   }
 }
 </style>
