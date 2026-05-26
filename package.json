@@ -12,7 +12,7 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
-    "dev": "cross-env WEB_PORT=3457 electron-vite dev",
+    "dev": "cross-env NODE_ENV=development WEB_PORT=3457 VITE_DEV_SERVER_URL=http://localhost:3456/ electron-vite dev",
     "dev:hmr": "cross-env NODE_ENV=development WEB_PORT=3457 VITE_DEV_SERVER_URL=http://localhost:3456/ electron-vite dev",
     "dev:watch": "node restart-manager.js",
     "dev:auto": "npm run dev",

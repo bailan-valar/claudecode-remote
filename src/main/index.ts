@@ -8,6 +8,14 @@ import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState } from './engineState'
 import { broadcast } from './events'
 import { getSessionAction } from './apiActions'
+import { getConfig, type AppConfig } from './configStore'
+
+// 优先使用环境变量（开发时），否则使用配置文件（打包后）
+const config = getConfig()
+const couchBaseUrl =
+  process.env.COUCHDB_URL?.replace(/\/[^/]*$/, '') ||
+  config.couchDbUrl?.replace(/\/[^/]*$/, '') ||
+  'http://localhost:5984'
 
 let engine: TaskEngine | null = null
 
@@ -57,18 +65,20 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
-const couchBaseUrl =
-  process.env.COUCHDB_URL?.replace(/\/[^/]*$/, '') || 'http://localhost:5984'
-
 export const syncManager = new SyncManager({
   baseUrl: couchBaseUrl,
   adminAuth:
-    process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD
+    (process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD)
       ? {
           username: process.env.COUCHDB_ADMIN_USER,
           password: process.env.COUCHDB_ADMIN_PASSWORD,
         }
-      : undefined,
+      : (config.couchDbAdminUser && config.couchDbAdminPassword)
+        ? {
+            username: config.couchDbAdminUser,
+            password: config.couchDbAdminPassword,
+          }
+        : undefined,
 })
 
 syncManager.on('status', (status) => {
@@ -81,12 +91,17 @@ syncManager.on('status', (status) => {
 export const authManager = new AuthManager({
   baseUrl: couchBaseUrl,
   adminAuth:
-    process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD
+    (process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD)
       ? {
           username: process.env.COUCHDB_ADMIN_USER,
           password: process.env.COUCHDB_ADMIN_PASSWORD,
         }
-      : undefined,
+      : (config.couchDbAdminUser && config.couchDbAdminPassword)
+        ? {
+            username: config.couchDbAdminUser,
+            password: config.couchDbAdminPassword,
+          }
+        : undefined,
 })
 
 app.whenReady().then(async () => {

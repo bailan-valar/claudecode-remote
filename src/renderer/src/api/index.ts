@@ -50,6 +50,30 @@ function ensureSse(): EventSource {
       const args = Array.isArray(payload) ? payload : [payload]
       sseListeners.get('engine:task:logs_updated')?.forEach((cb) => cb(...args))
     })
+    sseSource.addEventListener('task:created', (e) => {
+      const data = JSON.parse((e as MessageEvent).data)
+      sseListeners.get('task:created')?.forEach((cb) => cb(data))
+    })
+    sseSource.addEventListener('task:updated', (e) => {
+      const data = JSON.parse((e as MessageEvent).data)
+      sseListeners.get('task:updated')?.forEach((cb) => cb(data))
+    })
+    sseSource.addEventListener('task:deleted', (e) => {
+      const data = JSON.parse((e as MessageEvent).data)
+      sseListeners.get('task:deleted')?.forEach((cb) => cb(data))
+    })
+    sseSource.addEventListener('project:created', (e) => {
+      const data = JSON.parse((e as MessageEvent).data)
+      sseListeners.get('project:created')?.forEach((cb) => cb(data))
+    })
+    sseSource.addEventListener('project:updated', (e) => {
+      const data = JSON.parse((e as MessageEvent).data)
+      sseListeners.get('project:updated')?.forEach((cb) => cb(data))
+    })
+    sseSource.addEventListener('project:deleted', (e) => {
+      const data = JSON.parse((e as MessageEvent).data)
+      sseListeners.get('project:deleted')?.forEach((cb) => cb(data))
+    })
   }
   return sseSource
 }
@@ -75,6 +99,10 @@ function registerSseListener(event: string, cb: (...args: any[]) => void): () =>
 const httpApi: Api = {
   onSyncStatus: (cb) => registerSseListener('sync:status', cb),
   refreshSync: () => httpInvoke('POST', '/api/sync/refresh'),
+
+  getConfig: () => httpInvoke('GET', '/api/config'),
+  saveConfig: (config) => httpInvoke('POST', '/api/config', config),
+  resetConfig: () => httpInvoke('POST', '/api/config/reset'),
 
   login: (username, password) => httpInvoke('POST', '/api/auth/login', { username, password }),
   register: (username, password) => httpInvoke('POST', '/api/auth/register', { username, password }),
@@ -108,6 +136,13 @@ const httpApi: Api = {
   onEngineTaskCompleted: (cb) => registerSseListener('engine:task:completed', cb),
   onEngineTaskFailed: (cb) => registerSseListener('engine:task:failed', cb),
   onEngineTaskLogsUpdated: (cb) => registerSseListener('engine:task:logs_updated', cb),
+
+  onTaskCreated: (cb) => registerSseListener('task:created', cb),
+  onTaskUpdated: (cb) => registerSseListener('task:updated', cb),
+  onTaskDeleted: (cb) => registerSseListener('task:deleted', cb),
+  onProjectCreated: (cb) => registerSseListener('project:created', cb),
+  onProjectUpdated: (cb) => registerSseListener('project:updated', cb),
+  onProjectDeleted: (cb) => registerSseListener('project:deleted', cb),
 
   selectDirectory: () => Promise.resolve({ ok: false, error: '浏览器不支持系统目录选择' }),
 

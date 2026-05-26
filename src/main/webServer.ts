@@ -5,8 +5,9 @@ import { join, extname } from 'path'
 import { mainEvents } from './events'
 import * as api from './apiActions'
 import type { LogEntry } from './engine/runner'
+import { getConfig } from './configStore'
 
-const PORT = parseInt(process.env.WEB_PORT || '3456', 10)
+const PORT = parseInt(process.env.WEB_PORT || String(getConfig().webPort) || '3456', 10)
 const STATIC_DIR = join(__dirname, '../renderer')
 
 const MIME_TYPES: Record<string, string> = {
@@ -111,6 +112,12 @@ mainEvents.on('engine:status', (status) => broadcastToSse('engine:status', statu
 mainEvents.on('engine:task:completed', (taskId, result) => broadcastToSse('engine:task:completed', taskId, result))
 mainEvents.on('engine:task:failed', (taskId, error) => broadcastToSse('engine:task:failed', taskId, error))
 mainEvents.on('engine:task:logs_updated', (taskId, logs) => broadcastToSse('engine:task:logs_updated', taskId, logs))
+mainEvents.on('task:created', (task) => broadcastToSse('task:created', task))
+mainEvents.on('task:updated', (task) => broadcastToSse('task:updated', task))
+mainEvents.on('task:deleted', (id) => broadcastToSse('task:deleted', id))
+mainEvents.on('project:created', (project) => broadcastToSse('project:created', project))
+mainEvents.on('project:updated', (project) => broadcastToSse('project:updated', project))
+mainEvents.on('project:deleted', (id) => broadcastToSse('project:deleted', id))
 mainEvents.on('claude:chat:log', (entry: LogEntry) => broadcastToSse('claude:chat:log', entry))
 mainEvents.on('claude:chat:done', (result: any) => broadcastToSse('claude:chat:done', result))
 mainEvents.on('system:restart-imminent', (data) => broadcastToSse('system:restart-imminent', data))
@@ -321,6 +328,35 @@ export function startWebServer(): void {
           const { syncManager } = await import('./index')
           syncManager.restart()
           sendJson(res, 200, { ok: true })
+          return
+        }
+
+        // Config
+        if (pathname === '/api/config' && req.method === 'GET') {
+          const { getConfig } = await import('./configStore')
+          sendJson(res, 200, { ok: true, config: getConfig() })
+          return
+        }
+
+        if (pathname === '/api/config' && req.method === 'POST') {
+          const { saveConfig } = await import('./configStore')
+          try {
+            saveConfig(body)
+            sendJson(res, 200, { ok: true })
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '保存配置失败' })
+          }
+          return
+        }
+
+        if (pathname === '/api/config/reset' && req.method === 'POST') {
+          const { resetConfig } = await import('./configStore')
+          try {
+            resetConfig()
+            sendJson(res, 200, { ok: true })
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '重置配置失败' })
+          }
           return
         }
 

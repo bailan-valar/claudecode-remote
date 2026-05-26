@@ -125,6 +125,7 @@ export async function createProjectAction(doc: Omit<Project, '_id' | '_rev' | 't
     updatedAt: now,
   })
   console.log('[api] project:create ok', project._id)
+  broadcast('project:created', project)
   return { ok: true, project }
 }
 
@@ -135,6 +136,7 @@ export async function updateProjectAction(id: string, changes: Partial<Project>)
   const repo = createProjectRepository(db)
   const project = await repo.update(id, { ...changes, updatedAt: new Date().toISOString() })
   console.log('[api] project:update ok', project._rev)
+  broadcast('project:updated', project)
   return { ok: true, project }
 }
 
@@ -145,6 +147,7 @@ export async function deleteProjectAction(id: string) {
   const repo = createProjectRepository(db)
   await repo.delete(id)
   console.log('[api] project:delete ok')
+  broadcast('project:deleted', id)
   return { ok: true }
 }
 
@@ -193,6 +196,7 @@ export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' |
     statusHistory,
   } as any)
   console.log('[api] task:create ok', task._id)
+  broadcast('task:created', task)
   return { ok: true, task }
 }
 
@@ -213,6 +217,7 @@ export async function updateTaskAction(id: string, changes: Partial<Task>) {
 
   const task = await repo.update(id, { ...merged, updatedAt: new Date().toISOString() })
   console.log('[api] task:update ok', task._rev)
+  broadcast('task:updated', task)
   return { ok: true, task }
 }
 
@@ -223,6 +228,7 @@ export async function deleteTaskAction(id: string) {
   const repo = createTaskRepository(db)
   await repo.delete(id)
   console.log('[api] task:delete ok')
+  broadcast('task:deleted', id)
   return { ok: true }
 }
 

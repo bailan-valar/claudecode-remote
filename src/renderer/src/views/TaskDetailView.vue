@@ -284,11 +284,11 @@ async function handleTransition(status: Task['status']) {
   if (result.ok) task.value = result.task
 }
 
-async function handleUpdate(changes?: Partial<Task>) {
-  if (!editingTask.value || !changes) return
-  const result = await taskStore.update(editingTask.value._id, changes)
+async function handleUpdate(emittedTask?: Task, changes?: Partial<Task>) {
+  if (!emittedTask || !changes) return
+  const result = await taskStore.update(emittedTask._id, changes)
   if (result.ok) {
-    if (task.value && task.value._id === editingTask.value._id) {
+    if (task.value && task.value._id === emittedTask._id) {
       task.value = result.task
     }
     showTaskDialog.value = false

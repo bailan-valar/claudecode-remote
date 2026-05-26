@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Project, Task, ChatMessage } from '../shared/types'
 import type { LogEntry } from '../main/engine/runner'
+import type { AppConfig } from '../main/configStore'
 
 export type SyncStatus =
   | { phase: 'idle' }
@@ -17,6 +18,11 @@ const api = {
     return () => { ipcRenderer.off('sync:status', listener) }
   },
   refreshSync: () => ipcRenderer.invoke('sync:refresh'),
+
+  // === Config ===
+  getConfig: () => ipcRenderer.invoke('config:get'),
+  saveConfig: (config: Partial<AppConfig>) => ipcRenderer.invoke('config:save', config),
+  resetConfig: () => ipcRenderer.invoke('config:reset'),
 
   // === Auth ===
   login: (username: string, password: string) =>
@@ -74,6 +80,38 @@ const api = {
     return () => { ipcRenderer.off('engine:task:logs_updated', listener) }
   },
 
+  // === Task/Project Change Events ===
+  onTaskCreated: (cb: (task: Task) => void): (() => void) => {
+    const listener = (_: unknown, task: Task) => cb(task)
+    ipcRenderer.on('task:created', listener)
+    return () => { ipcRenderer.off('task:created', listener) }
+  },
+  onTaskUpdated: (cb: (task: Task) => void): (() => void) => {
+    const listener = (_: unknown, task: Task) => cb(task)
+    ipcRenderer.on('task:updated', listener)
+    return () => { ipcRenderer.off('task:updated', listener) }
+  },
+  onTaskDeleted: (cb: (id: string) => void): (() => void) => {
+    const listener = (_: unknown, id: string) => cb(id)
+    ipcRenderer.on('task:deleted', listener)
+    return () => { ipcRenderer.off('task:deleted', listener) }
+  },
+  onProjectCreated: (cb: (project: Project) => void): (() => void) => {
+    const listener = (_: unknown, project: Project) => cb(project)
+    ipcRenderer.on('project:created', listener)
+    return () => { ipcRenderer.off('project:created', listener) }
+  },
+  onProjectUpdated: (cb: (project: Project) => void): (() => void) => {
+    const listener = (_: unknown, project: Project) => cb(project)
+    ipcRenderer.on('project:updated', listener)
+    return () => { ipcRenderer.off('project:updated', listener) }
+  },
+  onProjectDeleted: (cb: (id: string) => void): (() => void) => {
+    const listener = (_: unknown, id: string) => cb(id)
+    ipcRenderer.on('project:deleted', listener)
+    return () => { ipcRenderer.off('project:deleted', listener) }
+  },
+
   // === Claude Chat ===
   chatWithClaude: (projectId: string, message: string, sessionId?: string) =>
     ipcRenderer.invoke('claude:chat', projectId, message, sessionId),
@@ -105,3 +143,4 @@ const api = {
 
 contextBridge.exposeInMainWorld('api', api)
 export type Api = typeof api
+export type { AppConfig }

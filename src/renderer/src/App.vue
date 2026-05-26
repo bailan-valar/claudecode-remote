@@ -18,7 +18,8 @@ function checkMobile() {
 }
 
 onMounted(() => {
-  auth.checkSession()
+  // checkSession 已在路由守卫中调用，这里不再重复调用
+  // auth.checkSession()
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
@@ -76,6 +77,10 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
             <span class="nav-icon">▤</span>
             <span class="nav-label">任务</span>
           </RouterLink>
+          <RouterLink to="/settings" class="nav-item" title="设置">
+            <span class="nav-icon">⚙</span>
+            <span class="nav-label">设置</span>
+          </RouterLink>
         </nav>
         <div class="user">
           <span class="username">{{ auth.currentUser.username }}</span>
@@ -106,6 +111,10 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
         <RouterLink to="/tasks" class="mobile-nav-item">
           <span class="mobile-icon">▤</span>
           <span class="mobile-label">任务</span>
+        </RouterLink>
+        <RouterLink to="/settings" class="mobile-nav-item">
+          <span class="mobile-icon">⚙</span>
+          <span class="mobile-label">设置</span>
         </RouterLink>
         <button class="mobile-nav-item logout" @click="auth.logout()">
           <span class="mobile-icon">⎋</span>

@@ -129,7 +129,14 @@ export class TaskEngine extends EventEmitter {
       .on('change', (change) => {
         const doc = change.doc as any
         if (!doc || doc.type !== 'task') return
-        if (doc.status === TASK_STATUS.PENDING || doc.status === TASK_STATUS.PLAN_REQUIRED) {
+
+        // 更严格的状态检查，避免重复入队
+        const shouldEnqueue = (doc.status === TASK_STATUS.PENDING || doc.status === TASK_STATUS.PLAN_REQUIRED) &&
+                             !this.runningTasks.has(doc._id) &&
+                             !this.queuedTaskIds.has(doc._id) &&
+                             !this.taskEnqueueLocks.has(doc._id)
+
+        if (shouldEnqueue) {
           this._enqueue(doc as Task)
         }
       })
@@ -204,8 +211,16 @@ export class TaskEngine extends EventEmitter {
     // 从停止列表中移除
     this.stoppedTaskIds.delete(taskId)
 
+    // 清理可能存在的锁状态，确保任务可以被重新入队
+    this.queuedTaskIds.delete(taskId)
+    const existingLock = this.taskEnqueueLocks.get(taskId)
+    if (existingLock) {
+      await existingLock
+      this.taskEnqueueLocks.delete(taskId)
+    }
+
     // 重新加入队列
-    this._enqueue(task)
+    await this._enqueue(task)
 
     return { ok: true }
   }
@@ -213,7 +228,15 @@ export class TaskEngine extends EventEmitter {
   private async _scanPending(): Promise<void> {
     const taskRepo = createTaskRepository(this.db)
     const tasks = await taskRepo.findAll()
-    const pending = tasks.filter((t) => t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PLAN_REQUIRED)
+    const pending = tasks.filter((t) => {
+      // 过滤掉已经在处理中的任务，避免重复入队
+      return (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PLAN_REQUIRED) &&
+             !this.runningTasks.has(t._id) &&
+             !this.queuedTaskIds.has(t._id) &&
+             !this.taskEnqueueLocks.has(t._id)
+    })
+
+    console.log(`[engine] scanning pending tasks: found ${pending.length} tasks to enqueue`)
     for (const task of pending) {
       this._enqueue(task)
     }
@@ -225,12 +248,19 @@ export class TaskEngine extends EventEmitter {
     // 获取任务级入队锁，防止同一个任务被并发入队
     const existingLock = this.taskEnqueueLocks.get(task._id)
     if (existingLock) {
+      console.log(`[engine] task ${task._id} is already being enqueued, waiting...`)
       await existingLock // 等待现有的入队操作完成
     }
 
     // 双重检查：在获取锁后再次检查任务状态
-    if (this.runningTasks.has(task._id)) return
-    if (this.queuedTaskIds.has(task._id)) return
+    if (this.runningTasks.has(task._id)) {
+      console.log(`[engine] task ${task._id} is already running, skipping enqueue`)
+      return
+    }
+    if (this.queuedTaskIds.has(task._id)) {
+      console.log(`[engine] task ${task._id} is already queued, skipping duplicate enqueue`)
+      return
+    }
 
     let resolveLock!: () => void
     const currentLock = new Promise<void>((resolve) => {
@@ -240,15 +270,24 @@ export class TaskEngine extends EventEmitter {
 
     try {
       // 第三次检查：在设置锁后再次确认
-      if (this.runningTasks.has(task._id)) return
-      if (this.queuedTaskIds.has(task._id)) return
+      if (this.runningTasks.has(task._id)) {
+        console.log(`[engine] task ${task._id} started running while waiting for lock, skipping`)
+        return
+      }
+      if (this.queuedTaskIds.has(task._id)) {
+        console.log(`[engine] task ${task._id} was queued while waiting for lock, skipping`)
+        return
+      }
 
       this.queuedTaskIds.add(task._id)
+      console.log(`[engine] enqueuing task ${task._id} (status: ${task.status}, queue size: ${this.queue.size})`)
+
       this.queue.add(async () => {
         try {
           await this._executeWithProjectLock(task)
         } finally {
           this.queuedTaskIds.delete(task._id)
+          console.log(`[engine] task ${task._id} removed from queue`)
         }
       })
 
@@ -308,6 +347,17 @@ export class TaskEngine extends EventEmitter {
     const projectRepo = createProjectRepository(this.db)
 
     const latestTask = await taskRepo.findById(task._id) ?? task
+
+    // 检查任务当前状态是否仍然可执行
+    const canExecute = latestTask.status === TASK_STATUS.PENDING ||
+                      latestTask.status === TASK_STATUS.PLAN_REQUIRED ||
+                      (latestTask.status === TASK_STATUS.STOPPED && !this.stoppedTaskIds.has(task._id))
+
+    if (!canExecute) {
+      console.log(`[engine] task ${task._id} status changed to ${latestTask.status}, skipping execution`)
+      return
+    }
+
     const isPlanTask = latestTask.isPlan === true
 
     const project = await projectRepo.findById(task.projectId)
@@ -335,13 +385,26 @@ export class TaskEngine extends EventEmitter {
 
     const startStatus = isPlanTask ? TASK_STATUS.PLANNING : TASK_STATUS.DEVELOPING
     const startTimeChanges = computeTimeTrackingChanges(latestTask, startStatus)
-    await taskRepo.update(task._id, {
-      status: startStatus,
-      claudeSessionId: inheritedSessionId,
-      reviewFeedback: undefined,
-      updatedAt: new Date().toISOString(),
-      ...startTimeChanges,
-    })
+
+    try {
+      // 使用乐观锁机制更新任务状态，防止并发执行
+      await taskRepo.update(task._id, {
+        status: startStatus,
+        claudeSessionId: inheritedSessionId,
+        reviewFeedback: undefined,
+        updatedAt: new Date().toISOString(),
+        ...startTimeChanges,
+      })
+    } catch (error: any) {
+      // 如果更新失败（可能是冲突），重新检查任务状态
+      const currentTask = await taskRepo.findById(task._id)
+      if (currentTask && currentTask.status !== startStatus) {
+        console.log(`[engine] task ${task._id} status conflict, current: ${currentTask.status}, skipping execution`)
+        return
+      }
+      throw error
+    }
+
     this.emit('task:started', task._id)
 
     const controller = new AbortController()

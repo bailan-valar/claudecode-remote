@@ -3,6 +3,8 @@ import { syncManager } from './index'
 import * as api from './apiActions'
 import { mainEvents } from './events'
 import type { LogEntry } from './engine/runner'
+import * as configStore from './configStore'
+import type { AppConfig } from './configStore'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   // --- Broadcast to renderer window ---
@@ -12,10 +14,42 @@ export function registerIpcHandlers(win: BrowserWindow) {
     }
   }
 
+  // --- Config handlers ---
+  ipcMain.removeHandler('config:get')
+  ipcMain.handle('config:get', async () => {
+    return { ok: true, config: configStore.getConfig() }
+  })
+
+  ipcMain.removeHandler('config:save')
+  ipcMain.handle('config:save', async (_, config: Partial<AppConfig>) => {
+    try {
+      configStore.saveConfig(config)
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '保存配置失败' }
+    }
+  })
+
+  ipcMain.removeHandler('config:reset')
+  ipcMain.handle('config:reset', async () => {
+    try {
+      configStore.resetConfig()
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '重置配置失败' }
+    }
+  })
+
   mainEvents.on('sync:status', (status) => sendToWin('sync:status', status))
   mainEvents.on('engine:status', (status) => sendToWin('engine:status', status))
   mainEvents.on('engine:task:completed', (taskId, result) => sendToWin('engine:task:completed', taskId, result))
   mainEvents.on('engine:task:failed', (taskId, error) => sendToWin('engine:task:failed', taskId, error))
+  mainEvents.on('task:created', (task) => sendToWin('task:created', task))
+  mainEvents.on('task:updated', (task) => sendToWin('task:updated', task))
+  mainEvents.on('task:deleted', (id) => sendToWin('task:deleted', id))
+  mainEvents.on('project:created', (project) => sendToWin('project:created', project))
+  mainEvents.on('project:updated', (project) => sendToWin('project:updated', project))
+  mainEvents.on('project:deleted', (id) => sendToWin('project:deleted', id))
   mainEvents.on('claude:chat:log', (entry: LogEntry) => sendToWin('claude:chat:log', entry))
   mainEvents.on('claude:chat:done', (result: any) => sendToWin('claude:chat:done', result))
 

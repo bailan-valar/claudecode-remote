@@ -7,6 +7,7 @@ const ProjectsView = () => import('../views/ProjectsView.vue')
 const TasksView = () => import('../views/TasksView.vue')
 const TaskDetailView = () => import('../views/TaskDetailView.vue')
 const ProjectDetailView = () => import('../views/ProjectDetailView.vue')
+const SettingsView = () => import('../views/SettingsView.vue')
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -17,11 +18,18 @@ export const router = createRouter({
     { path: '/projects/:id', name: 'project-detail', component: ProjectDetailView, meta: { keepAlive: true, cacheName: 'project-detail' } },
     { path: '/tasks', name: 'tasks', component: TasksView, meta: { keepAlive: true, cacheName: 'tasks' } },
     { path: '/tasks/:id', name: 'task-detail', component: TaskDetailView, meta: { keepAlive: true, cacheName: 'task-detail' } },
+    { path: '/settings', name: 'settings', component: SettingsView, meta: { keepAlive: false } },
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
+  // 等待会话检查完成
+  if (!auth.isInitialized) {
+    await auth.checkSession()
+  }
+
   if (!auth.currentUser && !to.meta.public) {
     return { name: 'login' }
   }

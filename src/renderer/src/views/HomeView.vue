@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { onMounted, defineOptions } from 'vue'
-import { useSyncStore } from '../stores/useSyncStore'
+// import { useSyncStore } from '../stores/useSyncStore' // 暂时隐藏同步功能
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useEngineStore } from '../stores/useEngineStore'
-import { storeToRefs } from 'pinia'
+// import { storeToRefs } from 'pinia' // 暂时不需要
 
 defineOptions({
   name: 'HomeView'
 })
 
-const store = useSyncStore()
-const { status } = storeToRefs(store)
+// const store = useSyncStore() // 暂时隐藏同步功能
+// const { status } = storeToRefs(store)
 const projectStore = useProjectStore()
 const taskStore = useTaskStore()
 const engineStore = useEngineStore()
@@ -23,38 +23,40 @@ onMounted(() => {
   // engineStore.listen() 已在 App.vue 中全局调用，这里不需要重复调用
 })
 
-function dotClass(phase: string): string {
-  switch (phase) {
-    case 'active':
-      return 'active'
-    case 'paused':
-      return 'paused'
-    case 'error':
-      return 'error'
-    default:
-      return 'connecting'
-  }
-}
+// 同步状态相关函数暂时不需要
+// function dotClass(phase: string): string {
+//   switch (phase) {
+//     case 'active':
+//       return 'active'
+//     case 'paused':
+//       return 'paused'
+//     case 'error':
+//       return 'error'
+//     default:
+//       return 'connecting'
+//   }
+// }
 
-function statusText(phase: string): string {
-  switch (phase) {
-    case 'active':
-      return '同步中'
-    case 'paused':
-      return '空闲'
-    case 'error':
-      return '连接失败'
-    default:
-      return '连接中...'
-  }
-}
+// function statusText(phase: string): string {
+//   switch (phase) {
+//     case 'active':
+//       return '同步中'
+//     case 'paused':
+//       return '空闲'
+//     case 'error':
+//       return '连接失败'
+//     default:
+//       return '连接中...'
+//   }
+// }
 </script>
 
 <template>
   <main class="home">
     <h1 class="page-title">概览</h1>
 
-    <section class="sync-card glass">
+    <!-- CouchDB 同步状态已暂时隐藏 -->
+    <!-- <section class="sync-card glass">
       <div class="sync-header">
         <span :class="['dot', dotClass(status.phase)]" />
         <h2>CouchDB 同步状态</h2>
@@ -67,7 +69,7 @@ function statusText(phase: string): string {
         <p v-if="status.message" class="error">{{ status.message }}</p>
       </div>
       <button class="glass-button" @click="store.refresh">刷新连接</button>
-    </section>
+    </section> -->
 
     <section class="engine-card glass">
       <div class="engine-header">
