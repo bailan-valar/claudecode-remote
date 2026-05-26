@@ -185,10 +185,18 @@ app.whenReady().then(async () => {
   const state = loadEngineState()
   engine = new TaskEngine({ db: defaultLocalDb, concurrency: state.concurrency ?? 1, provider: state.provider })
   engine.on('status', (status) => broadcast('engine:status', status))
-  engine.on('task:completed', (taskId, result) => {
+  engine.on('task:completed', async (taskId, result) => {
     broadcast('engine:task:completed', taskId, result)
+    // 发送任务完成通知
+    const { sendTaskCompletedNotification } = await import('./utils/notification')
+    await sendTaskCompletedNotification(defaultLocalDb!, taskId, true)
   })
-  engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
+  engine.on('task:failed', async (taskId, error) => {
+    broadcast('engine:task:failed', taskId, error)
+    // 发送任务失败通知
+    const { sendTaskCompletedNotification } = await import('./utils/notification')
+    await sendTaskCompletedNotification(defaultLocalDb!, taskId, false)
+  })
   engine.on('task:logs_updated', (taskId, logs) => broadcast('engine:task:logs_updated', taskId, logs))
   setEngine(engine)
   if (state.running) {

@@ -60,6 +60,7 @@ export async function autoCommit(
       story: '[故事]',
       bug: '[缺陷]',
       task: '[任务]',
+      chat: '[对话]',
     }
     const typeLabel = taskKind ? kindLabelMap[taskKind] : '[任务]'
 

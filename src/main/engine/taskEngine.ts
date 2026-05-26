@@ -51,6 +51,42 @@ export interface EngineOptions {
 }
 
 /**
+ * 检查任务是否满足开发完成条件（待审核、已完成等状态）
+ */
+function isTaskCompleted(status: TaskStatus): boolean {
+  return status === TASK_STATUS.REVIEWING ||
+         status === TASK_STATUS.PLAN_REVIEWING ||
+         status === TASK_STATUS.COMPLETED ||
+         status === TASK_STATUS.CLOSED
+}
+
+/**
+ * 检查任务的前置任务是否都已完成
+ */
+async function checkPrerequisitesCompleted(
+  task: Task,
+  taskRepo: ReturnType<typeof createTaskRepository>
+): Promise<{ completed: boolean; blockingTasks?: Task[] }> {
+  if (!task.prerequisiteTaskIds || task.prerequisiteTaskIds.length === 0) {
+    return { completed: true }
+  }
+
+  const blockingTasks: Task[] = []
+  for (const prereqId of task.prerequisiteTaskIds) {
+    const prereqTask = await taskRepo.findById(prereqId)
+    if (!prereqTask) {
+      console.warn(`[engine] prerequisite task ${prereqId} not found for task ${task._id}`)
+      continue
+    }
+    if (!isTaskCompleted(prereqTask.status)) {
+      blockingTasks.push(prereqTask)
+    }
+  }
+
+  return { completed: blockingTasks.length === 0, blockingTasks }
+}
+
+/**
  * 任务引擎：自动消费 pending 任务，按项目配置调用对应执行引擎。
  * 支持项目级串行 + 全局并发控制，执行引擎可插拔切换。
  */
@@ -66,6 +102,8 @@ export class TaskEngine extends EventEmitter {
   private stoppedTaskIds = new Set<string>()
   private queuedTaskIds = new Set<string>()
   private taskEnqueueLocks = new Map<string, Promise<void>>() // 任务级入队锁，防止并发入队同一个任务
+  private projectInQueue = new Set<string>() // 标记已有任务在 p-queue 中的项目
+  private deferredTasks = new Map<string, Task[]>() // 项目级延迟队列（不占用全局并发槽位）
 
   constructor(options: EngineOptions) {
     super()
@@ -163,6 +201,8 @@ export class TaskEngine extends EventEmitter {
     // 清空队列中等待的任务
     this.queue.clear()
     this.queuedTaskIds.clear()
+    this.projectInQueue.clear()
+    this.deferredTasks.clear()
 
     // 标记并中止正在运行的任务
     for (const [taskId, ctrl] of this.runningTasks) {
@@ -325,6 +365,16 @@ export class TaskEngine extends EventEmitter {
         return
       }
 
+      // 项目级串行：如果该项目已有任务在 p-queue 中，延迟入队（不占用全局并发槽位）
+      if (this.projectInQueue.has(task.projectId)) {
+        const deferred = this.deferredTasks.get(task.projectId) ?? []
+        deferred.push(task)
+        this.deferredTasks.set(task.projectId, deferred)
+        console.log(`[engine] task ${task._id} deferred for project ${task.projectId} (project already in queue, deferred: ${deferred.length})`)
+        return
+      }
+
+      this.projectInQueue.add(task.projectId)
       this.queuedTaskIds.add(task._id)
       console.log(`[engine] enqueuing task ${task._id} (status: ${task.status}, queue size: ${this.queue.size})`)
 
@@ -333,7 +383,19 @@ export class TaskEngine extends EventEmitter {
           await this._executeWithProjectLock(task)
         } finally {
           this.queuedTaskIds.delete(task._id)
+          this.projectInQueue.delete(task.projectId)
           console.log(`[engine] task ${task._id} removed from queue`)
+
+          // 调度该项目的下一个延迟任务
+          const deferred = this.deferredTasks.get(task.projectId)
+          if (deferred && deferred.length > 0) {
+            const nextTask = deferred.shift()!
+            if (deferred.length === 0) {
+              this.deferredTasks.delete(task.projectId)
+            }
+            console.log(`[engine] scheduling deferred task ${nextTask._id} for project ${task.projectId}`)
+            setImmediate(() => this._enqueue(nextTask))
+          }
         }
       })
 

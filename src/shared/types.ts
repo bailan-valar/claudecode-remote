@@ -78,6 +78,7 @@ export interface Task extends BaseDoc {
   totalDuration?: number
   statusHistory?: StatusHistoryEntry[]
   result?: string
+  prerequisiteTaskIds?: string[] // 前置任务ID列表
 }
 
 export interface ChatMessage extends BaseDoc {

@@ -8,13 +8,17 @@ const emit = defineEmits<{
   click: []
 }>()
 
-// 只在任务页面显示悬浮按钮
+// 全局显示悬浮按钮
 const isVisible = computed(() => {
-  return route.path === '/tasks' || route.path.startsWith('/projects/')
+  return true // 在所有页面都显示
 })
 
 const buttonLabel = computed(() => {
-  return route.path === '/tasks' ? '新建任务' : '添加任务'
+  // 根据不同页面显示不同的按钮文本
+  if (route.path === '/tasks') return '新建任务'
+  if (route.path.startsWith('/projects/')) return '添加任务'
+  if (route.path === '/settings') return '设置'
+  return '新增' // 默认文本
 })
 </script>
 

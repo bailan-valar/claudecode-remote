@@ -58,6 +58,10 @@ async function loadConfig() {
     const result = await apiClient.getConfig()
     if (result.ok) {
       config.value = result.config
+      // 确保通知设置有默认值
+      if (config.value.enableTaskNotification === undefined) {
+        config.value.enableTaskNotification = true
+      }
     } else {
       showMessage('error', '加载配置失败')
     }
@@ -417,6 +421,22 @@ function maskApiKey(key: string): string {
                 max="65535"
               />
               <span class="hint">手机端访问桌面端 UI 使用的端口</span>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>通知设置</h3>
+            <p class="field-desc">配置任务完成时的系统通知</p>
+
+            <div class="form-group checkbox-group">
+              <label class="checkbox-label">
+                <input
+                  v-model="config.enableTaskNotification"
+                  type="checkbox"
+                />
+                <span>启用任务完成通知</span>
+              </label>
+              <span class="hint">任务完成或失败时发送 Windows 系统通知</span>
             </div>
           </div>
 

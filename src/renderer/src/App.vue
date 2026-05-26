@@ -16,13 +16,20 @@ const isMobile = ref(false)
 
 // 悬浮按钮点击事件处理
 function handleFloatingButtonClick() {
-  // 检查当前路由，如果是任务页面，则触发全局事件打开创建面板
-  if (route.path === '/tasks') {
-    // 发射一个自定义事件，由TasksView监听
+  // 根据不同页面处理不同的逻辑
+  if (route.path === '/tasks' || route.path.startsWith('/projects/')) {
+    // 任务页面和项目详情页：打开创建任务面板
     window.dispatchEvent(new CustomEvent('open-task-create'))
-  } else if (route.path.startsWith('/project/')) {
-    // 如果是项目详情页，也可以创建任务
-    window.dispatchEvent(new CustomEvent('open-task-create'))
+  } else if (route.path === '/') {
+    // 首页：跳转到任务页面
+    router.push('/tasks')
+  } else if (route.path === '/settings') {
+    // 设置页面：可以打开设置相关的快捷功能
+    // 这里暂时不做处理，可以根据需要添加
+    console.log('设置页面悬浮按钮点击')
+  } else {
+    // 其他页面：默认行为
+    console.log('悬浮按钮点击，当前页面：', route.path)
   }
 }
 

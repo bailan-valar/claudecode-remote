@@ -14,11 +14,13 @@ export interface AppConfig {
   couchDbAdminPassword?: string
   webPort?: number
   defaultLlmProviderId?: string
+  enableTaskNotification?: boolean
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   couchDbUrl: 'http://localhost:5984',
   webPort: 3456,
+  enableTaskNotification: true,
 }
 
 const DEFAULT_PROVIDERS: LlmProvider[] = [
