@@ -28,36 +28,36 @@ function hasStatusInconsistency(task: Task, allTasks: Task[]): boolean {
   return children.some(child => hasStatusInconsistency(child, allTasks))
 }
 
+const STATUS_ORDER: TaskStatus[] = [
+  'planned',
+  'plan_required',
+  'planning',
+  'plan_reviewing',
+  'pending',
+  'developing',
+  'reviewing',
+  'completed',
+  'closed',
+  'stopped',
+  'failed'
+]
+
 function getTreeStatus(task: Task, allTasks: Task[]): TaskStatus {
-  const children = allTasks.filter((t) => t.parentTaskId === task._id)
+  const descendants = getAllDescendants(task, allTasks)
+  const allStatuses = [task.status, ...descendants.map((d) => d.status)]
 
-  if (children.length === 0) {
-    return task.status
-  }
+  let bestStatus: TaskStatus = task.status
+  let bestIndex = STATUS_ORDER.indexOf(task.status)
 
-  const childStatuses = children.map(child => getTreeStatus(child, allTasks))
-  const hasDifferentStatus = childStatuses.some(status => status !== task.status)
-
-  if (hasDifferentStatus) {
-    if (childStatuses.includes('failed')) return 'failed'
-    if (childStatuses.includes('stopped')) return 'stopped'
-
-    if (childStatuses.every(s => s === 'completed' || s === 'closed')) {
-      return 'developing'
-    }
-
-    const activeStatuses: TaskStatus[] = ['developing', 'planning', 'reviewing', 'plan_reviewing']
-    const hasActiveChild = childStatuses.some(s => activeStatuses.includes(s))
-    if (hasActiveChild) {
-      for (const activeStatus of activeStatuses) {
-        if (childStatuses.includes(activeStatus)) {
-          return activeStatus
-        }
-      }
+  for (const status of allStatuses) {
+    const index = STATUS_ORDER.indexOf(status)
+    if (index !== -1 && index < bestIndex) {
+      bestIndex = index
+      bestStatus = status
     }
   }
 
-  return task.status
+  return bestStatus
 }
 
 describe('父子任务状态处理', () => {
@@ -120,29 +120,41 @@ describe('父子任务状态处理', () => {
       expect(getTreeStatus(task, allTasks)).toBe('developing')
     })
 
-    it('应该优先显示失败的子任务状态', () => {
-      const parent = createTask('parent', 'developing')
+    it('应该按 STATUS_ORDER 取排序最前的状态', () => {
+      const parent = createTask('parent', 'reviewing')
       const child1 = createTask('child1', 'completed', 'parent')
       const child2 = createTask('child2', 'failed', 'parent')
       const allTasks = [parent, child1, child2]
 
-      expect(getTreeStatus(parent, allTasks)).toBe('failed')
+      // reviewing (索引6) < completed (7) < failed (10)
+      expect(getTreeStatus(parent, allTasks)).toBe('reviewing')
     })
 
-    it('应该显示活跃的子任务状态', () => {
+    it('子任务状态排序靠前时应取子任务状态', () => {
       const parent = createTask('parent', 'completed')
       const child = createTask('child', 'developing', 'parent')
       const allTasks = [parent, child]
 
+      // developing (索引5) < completed (7)
       expect(getTreeStatus(parent, allTasks)).toBe('developing')
     })
 
-    it('应该处理所有子任务完成的情况', () => {
-      const parent = createTask('parent', 'developing')
+    it('父任务待审核、子任务已完成时应取待审核', () => {
+      const parent = createTask('parent', 'reviewing')
       const child1 = createTask('child1', 'completed', 'parent')
       const child2 = createTask('child2', 'completed', 'parent')
       const allTasks = [parent, child1, child2]
 
+      // reviewing (索引6) < completed (7)
+      expect(getTreeStatus(parent, allTasks)).toBe('reviewing')
+    })
+
+    it('父任务待审核、子任务开发中时应取开发中', () => {
+      const parent = createTask('parent', 'reviewing')
+      const child = createTask('child', 'developing', 'parent')
+      const allTasks = [parent, child]
+
+      // developing (索引5) < reviewing (6)
       expect(getTreeStatus(parent, allTasks)).toBe('developing')
     })
   })

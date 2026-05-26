@@ -54,19 +54,19 @@ function showMenu() {
   emit('toggleSubmenu', true)
 }
 
-// 计算状态菜单的位置（在主菜单左侧屏幕右侧）
+// 计算状态菜单的位置（在主菜单右侧）
 const statusMenuStyle = computed(() => {
   const right = parseFloat(props.dropdownStyle.right)
   const top = parseFloat(props.dropdownStyle.top)
 
   // right是距离浏览器右边的距离
-  // 要在主菜单的左侧（屏幕右侧）显示，需要加上主菜单宽度和间距
-  const mainMenuWidth = props.compact ? 140 : 160 // 主菜单宽度
+  // 要在主菜单的右侧显示，需要减去状态菜单的宽度和间距
+  const sideMenuWidth = props.compact ? 140 : 180 // 状态菜单宽度
   const gap = 4 // 两个菜单之间的间距
 
   return {
     top: `${top}px`,
-    right: `${right + mainMenuWidth + gap}px`, // 在主菜单左侧，距离浏览器右边更远
+    right: `${right - sideMenuWidth - gap}px`, // 在主菜单右侧，距离浏览器右边更近
   }
 })
 
@@ -81,8 +81,8 @@ const bridgeStyle = computed(() => {
 
   return {
     top: `${top}px`,
-    right: `${right + mainMenuWidth}px`, // 从主菜单左边开始
-    width: `${gap + sideMenuWidth}px`, // 覆盖到状态菜单右边
+    right: `${right - sideMenuWidth - gap}px`, // 从状态菜单左边开始
+    width: `${sideMenuWidth + gap + mainMenuWidth}px`, // 覆盖从状态菜单到主菜单的完整区域
     height: '400px', // 足够覆盖菜单高度
   }
 })
@@ -162,7 +162,7 @@ onUnmounted(() => {
       >
         <span class="dropdown-icon">🔀</span>
         修改状态
-        <span class="submenu-arrow">▶</span>
+        <span class="submenu-arrow">◀</span>
       </button>
       <div class="dropdown-divider"></div>
       <button v-if="showSubtask" class="dropdown-item" @click="onCreateSubtask">

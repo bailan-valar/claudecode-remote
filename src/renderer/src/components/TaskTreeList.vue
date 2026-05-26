@@ -65,45 +65,23 @@ function toggleGroup(status: TaskStatus) {
   collapsedGroups.value = next
 }
 
-// 计算任务树的综合状态，考虑子任务状态
+// 计算任务树的综合状态，取父子任务中在 STATUS_ORDER 排序最前的状态
 function getTreeStatus(task: Task, allTasks: Task[]): TaskStatus {
-  const children = allTasks.filter((t) => t.parentTaskId === task._id)
+  const descendants = getAllDescendants(task, allTasks)
+  const allStatuses = [task.status, ...descendants.map((d) => d.status)]
 
-  if (children.length === 0) {
-    return task.status
-  }
+  let bestStatus: TaskStatus = task.status
+  let bestIndex = STATUS_ORDER.indexOf(task.status)
 
-  // 递归检查所有子任务
-  const childStatuses = children.map(child => getTreeStatus(child, allTasks))
-
-  // 如果有子任务状态与当前任务不同，则需要特殊处理
-  const hasDifferentStatus = childStatuses.some(status => status !== task.status)
-
-  if (hasDifferentStatus) {
-    // 优先级规则：
-    // 1. 如果有失败/停止的子任务，显示为警告状态
-    if (childStatuses.includes('failed')) return 'failed'
-    if (childStatuses.includes('stopped')) return 'stopped'
-
-    // 2. 如果所有子任务都已完成，但父任务不是，显示为进行中
-    if (childStatuses.every(s => s === 'completed' || s === 'closed')) {
-      return 'developing' // 表示正在进行最后的整合
-    }
-
-    // 3. 如果有活跃的子任务，显示最活跃的状态
-    const activeStatuses: TaskStatus[] = ['developing', 'planning', 'reviewing', 'plan_reviewing']
-    const hasActiveChild = childStatuses.some(s => activeStatuses.includes(s))
-    if (hasActiveChild) {
-      // 找到最活跃的子任务状态
-      for (const activeStatus of activeStatuses) {
-        if (childStatuses.includes(activeStatus)) {
-          return activeStatus
-        }
-      }
+  for (const status of allStatuses) {
+    const index = STATUS_ORDER.indexOf(status)
+    if (index !== -1 && index < bestIndex) {
+      bestIndex = index
+      bestStatus = status
     }
   }
 
-  return task.status
+  return bestStatus
 }
 
 // 检查任务树中是否存在状态不一致
