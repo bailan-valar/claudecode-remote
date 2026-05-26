@@ -651,9 +651,15 @@ watch(() => task.value?.logs, () => {
               <pre class="content-block">{{ selectedPhase.result || task.result || '无结果内容' }}</pre>
             </template>
 
+            <template v-else-if="selectedPhase.status === 'pending'">
+              <div class="content-label">任务执行提示词</div>
+              <pre class="content-block">{{ task.description || '无描述内容' }}</pre>
+            </template>
             <template v-else>
               <div class="content-empty">该阶段暂无详细内容</div>
             </template>
+
+
           </div>
         </div>
       </div>
