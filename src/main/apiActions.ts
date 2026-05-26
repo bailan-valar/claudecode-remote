@@ -315,6 +315,50 @@ export async function setEngineProviderAction(name: string) {
   return { ok: true }
 }
 
+// === CouchDB Connection Test ===
+
+export async function testCouchdbConnectionAction(config: { url: string; adminUser?: string; adminPassword?: string }) {
+  console.log('[api] config:test-couchdb', config.url)
+  try {
+    const baseUrl = config.url.replace(/\/$/, '')
+    const testUrl = `${baseUrl}/`
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    }
+
+    if (config.adminUser && config.adminPassword) {
+      headers['Authorization'] = 'Basic ' + Buffer.from(`${config.adminUser}:${config.adminPassword}`).toString('base64')
+    }
+
+    const response = await fetch(testUrl, { headers })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('[api] config:test-couchdb ok', data.version)
+      return { ok: true, version: data.version }
+    }
+
+    const errorText = await response.text().catch(() => 'Unknown error')
+    console.error('[api] config:test-couchdb failed', response.status, errorText)
+
+    if (response.status === 401) {
+      return { ok: false, error: '认证失败：用户名或密码错误' }
+    }
+    if (response.status === 404) {
+      return { ok: false, error: 'CouchDB 服务器未找到，请检查 URL' }
+    }
+    if (response.status === 0 || response.type === 'opaque') {
+      return { ok: false, error: '无法连接到服务器，请检查网络和 CORS 设置' }
+    }
+
+    return { ok: false, error: `连接失败 (${response.status}): ${errorText}` }
+  } catch (err: any) {
+    console.error('[api] config:test-couchdb error:', err.message)
+    return { ok: false, error: err.message || '连接失败' }
+  }
+}
+
 // === Webhook ===
 
 export async function testWebhookAction(webhookUrl: string) {
@@ -419,6 +463,149 @@ export async function clearChatHistoryAction(projectId: string) {
 
   console.log('[api] chat:clear ok')
   return { ok: true }
+}
+
+// === Data Export/Import ===
+
+export interface DataExport {
+  version: string
+  exportedAt: string
+  projects: Project[]
+  tasks: Task[]
+  chatMessages?: ChatMessage[]
+}
+
+export async function exportDataAction() {
+  console.log('[api] data:export')
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+
+  try {
+    const projectRepo = createProjectRepository(db)
+    const taskRepo = createTaskRepository(db)
+    const chatRepo = createChatRepository(db)
+
+    const projects = await projectRepo.findAll()
+    const tasks = await taskRepo.findAll()
+    const chatMessages = await chatRepo.findAll()
+
+    const data: DataExport = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      projects,
+      tasks,
+      chatMessages,
+    }
+
+    console.log('[api] data:export ok', { projects: projects.length, tasks: tasks.length })
+    return { ok: true, data }
+  } catch (err: any) {
+    console.error('[api] data:export error:', err.message)
+    return { ok: false, error: err.message || '导出失败' }
+  }
+}
+
+export interface ImportOptions {
+  mergeMode?: boolean // true=合并（保留现有数据）, false=覆盖（删除后导入）
+  skipConflicts?: boolean // true=跳过冲突, false=覆盖冲突数据
+}
+
+export interface ImportResult {
+  projectsCreated: number
+  projectsUpdated: number
+  projectsSkipped: number
+  tasksCreated: number
+  tasksUpdated: number
+  tasksSkipped: number
+  chatMessagesImported: number
+  errors: string[]
+}
+
+export async function importDataAction(
+  data: DataExport,
+  options: ImportOptions = {}
+) {
+  console.log('[api] data:import', options)
+  const db = syncManager.getLocalDb()
+  if (!db) return { ok: false, error: '未登录' }
+
+  const result: ImportResult = {
+    projectsCreated: 0,
+    projectsUpdated: 0,
+    projectsSkipped: 0,
+    tasksCreated: 0,
+    tasksUpdated: 0,
+    tasksSkipped: 0,
+    chatMessagesImported: 0,
+    errors: [],
+  }
+
+  const mergeMode = options.mergeMode ?? true
+  const skipConflicts = options.skipConflicts ?? false
+
+  try {
+    const projectRepo = createProjectRepository(db)
+    const taskRepo = createTaskRepository(db)
+    const chatRepo = createChatRepository(db)
+
+    // 导入项目
+    for (const project of data.projects) {
+      try {
+        const existing = await projectRepo.findById(project._id)
+        if (existing) {
+          if (skipConflicts) {
+            result.projectsSkipped++
+          } else {
+            await projectRepo.update(project._id, project)
+            result.projectsUpdated++
+          }
+        } else {
+          await projectRepo.create(project)
+          result.projectsCreated++
+        }
+      } catch (err: any) {
+        result.errors.push(`项目 ${project.name || project._id} 导入失败: ${err.message}`)
+      }
+    }
+
+    // 导入任务
+    for (const task of data.tasks) {
+      try {
+        const existing = await taskRepo.findById(task._id)
+        if (existing) {
+          if (skipConflicts) {
+            result.tasksSkipped++
+          } else {
+            await taskRepo.update(task._id, task)
+            result.tasksUpdated++
+          }
+        } else {
+          await taskRepo.create(task)
+          result.tasksCreated++
+        }
+      } catch (err: any) {
+        result.errors.push(`任务 ${task.title || task._id} 导入失败: ${err.message}`)
+      }
+    }
+
+    // 导入聊天记录
+    if (data.chatMessages) {
+      for (const msg of data.chatMessages) {
+        try {
+          await chatRepo.create(msg)
+          result.chatMessagesImported++
+        } catch (err: any) {
+          result.errors.push(`聊天消息导入失败: ${err.message}`)
+        }
+      }
+    }
+
+    console.log('[api] data:import ok', result)
+    return { ok: true, result }
+  } catch (err: any) {
+    console.error('[api] data:import error:', err.message)
+    return { ok: false, error: err.message || '导入失败', result }
+  }
 }
 
 // === Terminal ===

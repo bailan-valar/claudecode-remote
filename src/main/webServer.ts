@@ -322,6 +322,19 @@ export function startWebServer(): void {
           return
         }
 
+        // Data Export/Import
+        if (pathname === '/api/data/export' && req.method === 'GET') {
+          const result = await api.exportDataAction()
+          sendJson(res, 200, result)
+          return
+        }
+
+        if (pathname === '/api/data/import' && req.method === 'POST') {
+          const result = await api.importDataAction(body.data, body.options)
+          sendJson(res, 200, result)
+          return
+        }
+
         // Sync
         if (pathname === '/api/sync/refresh' && req.method === 'POST') {
           // imported dynamically to avoid circular dep at module level if needed
@@ -357,6 +370,12 @@ export function startWebServer(): void {
           } catch (err: any) {
             sendJson(res, 500, { ok: false, error: err.message || '重置配置失败' })
           }
+          return
+        }
+
+        if (pathname === '/api/config/test-couchdb' && req.method === 'POST') {
+          const result = await api.testCouchdbConnectionAction(body)
+          sendJson(res, 200, result)
           return
         }
 

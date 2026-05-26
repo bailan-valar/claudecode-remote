@@ -40,6 +40,11 @@ export function registerIpcHandlers(win: BrowserWindow) {
     }
   })
 
+  ipcMain.removeHandler('config:test-couchdb')
+  ipcMain.handle('config:test-couchdb', async (_, config: { url: string; adminUser?: string; adminPassword?: string }) => {
+    return api.testCouchdbConnectionAction(config)
+  })
+
   mainEvents.on('sync:status', (status) => sendToWin('sync:status', status))
   mainEvents.on('engine:status', (status) => sendToWin('engine:status', status))
   mainEvents.on('engine:task:completed', (taskId, result) => sendToWin('engine:task:completed', taskId, result))
@@ -188,6 +193,17 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.removeHandler('terminal:execute')
   ipcMain.handle('terminal:execute', async (_, projectId: string, command: string, workingDir?: string) => {
     return api.executeTerminalCommandAction(projectId, command, workingDir)
+  })
+
+  // --- Data Export/Import handlers ---
+  ipcMain.removeHandler('data:export')
+  ipcMain.handle('data:export', async () => {
+    return api.exportDataAction()
+  })
+
+  ipcMain.removeHandler('data:import')
+  ipcMain.handle('data:import', async (_, data: any, options?: any) => {
+    return api.importDataAction(data, options)
   })
 
   // --- System restart handlers ---

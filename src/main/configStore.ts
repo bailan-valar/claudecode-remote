@@ -26,11 +26,14 @@ function ensureConfigDir(): void {
 }
 
 export function saveConfig(config: Partial<AppConfig>): void {
+  console.log('[config] saveConfig input:', config)
   ensureConfigDir()
   const existing = loadConfig()
   const merged = { ...existing, ...config }
+  console.log('[config] merged config:', merged)
+  console.log('[config] writing to:', CONFIG_FILE)
   writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), { mode: 0o600 })
-  console.log('[config] saved', { couchDbUrl: merged.couchDbUrl, webPort: merged.webPort })
+  console.log('[config] saved successfully', { couchDbUrl: merged.couchDbUrl, webPort: merged.webPort })
 }
 
 export function loadConfig(): AppConfig {

@@ -1,4 +1,5 @@
 import { simpleGit, type SimpleGit } from 'simple-git'
+import type { TaskKind } from '../../shared/constants'
 
 function formatDuration(totalSeconds: number): string {
   if (totalSeconds < 0) totalSeconds = 0
@@ -27,7 +28,7 @@ export async function autoCommit(
   projectPath: string,
   taskTitle: string,
   durationSeconds?: number,
-  taskType?: 'plan' | 'develop',
+  taskKind?: TaskKind,
 ): Promise<GitCommitResult> {
   try {
     const git: SimpleGit = simpleGit(projectPath)
@@ -53,7 +54,14 @@ export async function autoCommit(
         : ''
 
     // 生成任务类型标签
-    const typeLabel = taskType === 'plan' ? '[计划]' : '[开发]'
+    const kindLabelMap: Record<TaskKind, string> = {
+      epic: '[史诗]',
+      requirement: '[需求]',
+      story: '[故事]',
+      bug: '[缺陷]',
+      task: '[任务]',
+    }
+    const typeLabel = taskKind ? kindLabelMap[taskKind] : '[任务]'
 
     // 优化后的提交信息格式：类型+标题+执行时长
     const commitMsg = durationText

@@ -103,6 +103,7 @@ const httpApi: Api = {
   getConfig: () => httpInvoke('GET', '/api/config'),
   saveConfig: (config) => httpInvoke('POST', '/api/config', config),
   resetConfig: () => httpInvoke('POST', '/api/config/reset'),
+  testCouchdbConnection: (config) => httpInvoke('POST', '/api/config/test-couchdb', config),
 
   login: (username, password) => httpInvoke('POST', '/api/auth/login', { username, password }),
   register: (username, password) => httpInvoke('POST', '/api/auth/register', { username, password }),
@@ -162,6 +163,9 @@ const httpApi: Api = {
 
   executeTerminalCommand: (projectId, command, workingDir?) =>
     httpInvoke('POST', '/api/terminal/execute', { projectId, command, workingDir }),
+
+  exportData: () => httpInvoke('GET', '/api/data/export'),
+  importData: (data, options?) => httpInvoke('POST', '/api/data/import', { data, options }),
 }
 
 export const apiClient: Api = isElectron ? (window as any).api : httpApi

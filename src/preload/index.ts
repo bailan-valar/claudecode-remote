@@ -23,6 +23,8 @@ const api = {
   getConfig: () => ipcRenderer.invoke('config:get'),
   saveConfig: (config: Partial<AppConfig>) => ipcRenderer.invoke('config:save', config),
   resetConfig: () => ipcRenderer.invoke('config:reset'),
+  testCouchdbConnection: (config: { url: string; adminUser?: string; adminPassword?: string }) =>
+    ipcRenderer.invoke('config:test-couchdb', config),
 
   // === Auth ===
   login: (username: string, password: string) =>
@@ -139,6 +141,11 @@ const api = {
 
   // === Webhook ===
   testWebhook: (webhookUrl: string) => ipcRenderer.invoke('webhook:test', webhookUrl),
+
+  // === Data Export/Import ===
+  exportData: () => ipcRenderer.invoke('data:export'),
+  importData: (data: any, options?: { mergeMode?: boolean; skipConflicts?: boolean }) =>
+    ipcRenderer.invoke('data:import', data, options),
 }
 
 contextBridge.exposeInMainWorld('api', api)

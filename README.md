@@ -8,6 +8,11 @@ ClaudeCode 多项目桌面客户端，基于 Electron + Vue 3 + PouchDB。
 2. `npm install`
 3. `npm run dev`
 
+## exe开发启动
+1. `taskkill /F /IM "ClaudeCode Remote.exe"`
+2. `npm run build:win`
+3. `start "" ".\dist\claudecode-remote-1.0.0-setup.exe"`
+
 ## 当前阶段（Phase 1）
 
 - Electron 窗口启动后会自动 sync 到 `${COUCHDB_URL}` 指定的 CouchDB 实例
