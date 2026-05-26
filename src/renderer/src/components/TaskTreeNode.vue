@@ -37,8 +37,8 @@ const children = computed(() => {
 const hasChildren = computed(() => children.value.length > 0)
 const isExpanded = computed(() => props.expandedIds.has(props.task._id))
 
-function handleTransition(status: TaskStatus) {
-  emit('transition', props.task._id, status)
+function handleTransition(taskId: string, status: TaskStatus) {
+  emit('transition', taskId, status)
 }
 </script>
 

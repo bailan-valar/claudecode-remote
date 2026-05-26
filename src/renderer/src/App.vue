@@ -71,10 +71,6 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
             <span class="nav-icon">⌂</span>
             <span class="nav-label">首页</span>
           </RouterLink>
-          <RouterLink to="/projects" class="nav-item" title="项目">
-            <span class="nav-icon">◈</span>
-            <span class="nav-label">项目</span>
-          </RouterLink>
           <RouterLink to="/tasks" class="nav-item" title="任务">
             <span class="nav-icon">▤</span>
             <span class="nav-label">任务</span>
@@ -102,10 +98,6 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
         <RouterLink to="/" class="mobile-nav-item">
           <span class="mobile-icon">⌂</span>
           <span class="mobile-label">首页</span>
-        </RouterLink>
-        <RouterLink to="/projects" class="mobile-nav-item">
-          <span class="mobile-icon">◈</span>
-          <span class="mobile-label">项目</span>
         </RouterLink>
         <RouterLink to="/tasks" class="mobile-nav-item">
           <span class="mobile-icon">▤</span>

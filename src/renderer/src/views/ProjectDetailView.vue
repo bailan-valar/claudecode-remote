@@ -39,6 +39,10 @@ const taskViewMode = ref<'list' | 'kanban'>('list')
 const subtaskParentId = ref<string | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
 
+// 新增项目列表相关状态
+const showProjectSidebar = ref(true)
+const showNewProjectForm = ref(false)
+
 // 控制是否隐藏聊天中的工具调用及结果（从本地存储读取偏好）
 const hideChatToolCalls = ref(localStorage.getItem('hideChatToolCalls') === 'true')
 
@@ -136,9 +140,22 @@ async function handleUpdate(changes?: Partial<Project>) {
   }
 }
 
+async function handleNewProject() {
+  showNewProjectForm.value = false
+  // 项目创建后会自动添加到store中
+  await projectStore.fetch()
+}
+
 async function handleDelete() {
   const result = await projectStore.remove(projectId)
-  if (result.ok) router.push({ name: 'projects' })
+  if (result.ok) {
+    // 如果删除后还有其他项目，跳转到第一个项目，否则跳转到首页
+    if (projectStore.projects.length > 0) {
+      router.push({ name: 'project-detail', params: { id: projectStore.projects[0]._id } })
+    } else {
+      router.push({ name: 'home' })
+    }
+  }
 }
 
 async function handleTaskCreated() {
@@ -514,24 +531,63 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!project" class="loading">加载中...</div>
-  <div v-else class="project-detail">
-    <header>
-      <h1 v-if="!isEditing" class="page-title">{{ project.name }}</h1>
-      <div class="actions">
-        <button v-if="!isEditing" class="glass-button" @click="isEditing = true">编辑</button>
-        <button v-else class="glass-button" @click="isEditing = false">取消编辑</button>
-        <button class="glass-button danger" @click="showDeleteConfirm = true">删除</button>
+  <div v-else class="project-detail-container">
+    <!-- 左侧项目切换面板 -->
+    <aside v-if="showProjectSidebar" class="project-sidebar glass">
+      <div class="sidebar-header">
+        <h3>项目</h3>
+        <button class="icon-button" @click="showProjectSidebar = false" title="收起">◀</button>
       </div>
-    </header>
 
-    <div v-if="isEditing" class="form-panel glass">
-      <ProjectForm
-        :initial-project="project"
-        mode="edit"
-        @submit="handleUpdate"
-        @cancel="isEditing = false"
-      />
-    </div>
+      <button class="new-project-btn glass-button primary" @click="showNewProjectForm = true">
+        + 新建项目
+      </button>
+
+      <div class="projects-list">
+        <div
+          v-for="p in projectStore.projects"
+          :key="p._id"
+          :class="['project-item', { active: p._id === projectId }]"
+          @click="router.push({ name: 'project-detail', params: { id: p._id } })"
+        >
+          <div class="project-name">{{ p.name }}</div>
+          <div class="project-path">{{ p.path }}</div>
+        </div>
+      </div>
+
+      <!-- 新建项目表单 -->
+      <div v-if="showNewProjectForm" class="new-project-form glass">
+        <ProjectForm
+          @submit="handleNewProject"
+          @cancel="showNewProjectForm = false"
+        />
+      </div>
+    </aside>
+
+    <!-- 展开按钮 -->
+    <button v-if="!showProjectSidebar" class="sidebar-toggle" @click="showProjectSidebar = true" title="展开项目列表">
+      ▶
+    </button>
+
+    <!-- 主内容区 -->
+    <div class="project-detail">
+      <header>
+        <h1 v-if="!isEditing" class="page-title">{{ project.name }}</h1>
+        <div class="actions">
+          <button v-if="!isEditing" class="glass-button" @click="isEditing = true">编辑</button>
+          <button v-else class="glass-button" @click="isEditing = false">取消编辑</button>
+          <button class="glass-button danger" @click="showDeleteConfirm = true">删除</button>
+        </div>
+      </header>
+
+      <div v-if="isEditing" class="form-panel glass">
+        <ProjectForm
+          :initial-project="project"
+          mode="edit"
+          @submit="handleUpdate"
+          @cancel="isEditing = false"
+        />
+      </div>
 
     <template v-else>
       <!-- Tab 切换 -->
@@ -837,13 +893,138 @@ onUnmounted(() => {
       @submit="handleTaskDialogSubmit"
       @cancel="closeTaskDialog"
     />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.project-detail-container {
+  display: flex;
+  gap: var(--space-lg);
+  position: relative;
+}
+
+.project-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  padding: var(--space-lg);
+  height: calc(100vh - var(--space-2xl) * 2);
+  overflow-y: auto;
+  position: sticky;
+  top: var(--space-2xl);
+  border-radius: var(--radius-lg);
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.sidebar-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.icon-button:hover {
+  background: var(--glass-bg-hover);
+  color: var(--color-text);
+}
+
+.new-project-btn {
+  width: 100%;
+  margin-bottom: var(--space-lg);
+}
+
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.project-item {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.project-item:hover {
+  background: var(--glass-bg-hover);
+}
+
+.project-item.active {
+  background: var(--glass-bg-strong);
+  border-color: var(--color-accent);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+.project-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  margin-bottom: var(--space-xs);
+}
+
+.project-path {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-family: 'SF Mono', Monaco, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-project-form {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+}
+
+.sidebar-toggle {
+  position: fixed;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  z-index: 100;
+}
+
+.sidebar-toggle:hover {
+  background: var(--glass-bg-hover);
+  color: var(--color-text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 .project-detail {
+  flex: 1;
   max-width: 900px;
-  margin: 0 auto;
 }
 
 .loading {
@@ -1385,7 +1566,34 @@ header .actions {
   padding: var(--space-sm) var(--space-lg);
 }
 
+@media (max-width: 768px) {
+  .project-sidebar {
+    width: 220px;
+  }
+
+  .project-detail {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 640px) {
+  .project-detail-container {
+    flex-direction: column;
+  }
+
+  .project-sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    position: static;
+  }
+
+  .sidebar-toggle {
+    top: auto;
+    bottom: 100px;
+    left: 16px;
+  }
+
   .task-item {
     padding: var(--space-md);
   }
