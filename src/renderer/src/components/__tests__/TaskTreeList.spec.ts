@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import type { Task } from '../../../shared/types'
-import type { TaskStatus } from '../../../shared/constants'
+import type { Task } from '../../../../shared/types'
+import type { TaskStatus } from '../../../../shared/constants'
 
 // 模拟 TaskTreeList 中的辅助函数进行测试
 

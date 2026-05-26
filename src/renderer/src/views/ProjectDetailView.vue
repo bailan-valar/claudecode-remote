@@ -115,10 +115,39 @@ onMounted(() => {
   taskStore.fetch(projectId)
   startTick()
   loadLlmProviders()
+
+  // 开发者调试：按 Ctrl+Shift+P 可以强制显示侧边栏
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+      showProjectSidebar.value = true
+      console.log('项目侧边栏已强制显示')
+    }
+  }
+  window.addEventListener('keydown', handleKeyPress)
+  ;(window as any).__sidebarKeyPressHandler = handleKeyPress
+
+  // 订阅聊天相关事件
+  chatLogUnsubscribe = apiClient.onClaudeChatLog(handleChatLog)
+  chatDoneUnsubscribe = apiClient.onClaudeChatDone(handleChatDone)
+
+  // 加载聊天历史
+  loadChatHistory()
+
+  // 监听悬浮按钮的点击事件
+  window.addEventListener('open-task-create', openCreateTaskDialog)
 })
 
 onUnmounted(() => {
   stopTick()
+  chatLogUnsubscribe?.()
+  chatDoneUnsubscribe?.()
+
+  // 移除事件监听
+  window.removeEventListener('open-task-create', openCreateTaskDialog)
+  if ((window as any).__sidebarKeyPressHandler) {
+    window.removeEventListener('keydown', (window as any).__sidebarKeyPressHandler)
+    delete (window as any).__sidebarKeyPressHandler
+  }
 })
 
 watch(
@@ -550,31 +579,6 @@ async function handleGitPush() {
     scrollTerminalToBottom()
   }
 }
-
-onMounted(() => {
-  project.value = projectStore.projects.find((p) => p._id === projectId)
-  if (!project.value) projectStore.fetch()
-  taskStore.fetch(projectId)
-  startTick()
-
-  chatLogUnsubscribe = apiClient.onClaudeChatLog(handleChatLog)
-  chatDoneUnsubscribe = apiClient.onClaudeChatDone(handleChatDone)
-
-  // 加载聊天历史
-  loadChatHistory()
-
-  // 监听悬浮按钮的点击事件
-  window.addEventListener('open-task-create', openCreateTaskDialog)
-})
-
-onUnmounted(() => {
-  stopTick()
-  chatLogUnsubscribe?.()
-  chatDoneUnsubscribe?.()
-
-  // 移除事件监听
-  window.removeEventListener('open-task-create', openCreateTaskDialog)
-})
 </script>
 
 <template>
@@ -625,9 +629,10 @@ onUnmounted(() => {
       </div>
     </aside>
 
-    <!-- 展开按钮 -->
-    <button v-if="!showProjectSidebar" class="sidebar-toggle" @click="showProjectSidebar = true" title="展开项目列表">
-      ▶
+    <!-- 展开按钮 - 更明显的样式 -->
+    <button v-if="!showProjectSidebar" class="sidebar-toggle-enhanced" @click="showProjectSidebar = true" title="展开项目列表">
+      <span class="toggle-icon">▶</span>
+      <span class="toggle-text">项目列表</span>
     </button>
 
     <!-- 主内容区 -->
@@ -1090,6 +1095,43 @@ onUnmounted(() => {
   background: var(--glass-bg-hover);
   color: var(--color-text);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-toggle-enhanced {
+  position: fixed;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-lg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  transition: all var(--transition-fast);
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 113, 227, 0.3);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.sidebar-toggle-enhanced:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 6px 20px rgba(0, 113, 227, 0.4);
+  transform: translateY(-50%) translateY(-2px);
+}
+
+.sidebar-toggle-enhanced .toggle-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.sidebar-toggle-enhanced .toggle-text {
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .project-detail {
@@ -1699,6 +1741,20 @@ header .actions {
     top: auto;
     bottom: 100px;
     left: 16px;
+  }
+
+  .sidebar-toggle-enhanced {
+    top: auto;
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    transform: none;
+    justify-content: center;
+    padding: var(--space-md);
+  }
+
+  .sidebar-toggle-enhanced:hover {
+    transform: translateY(-2px);
   }
 
   .task-item {
