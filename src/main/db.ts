@@ -1,5 +1,6 @@
 import PouchDB from 'pouchdb'
 import { EventEmitter } from 'node:events'
+import { join } from 'node:path'
 
 export type SyncStatus =
   | { phase: 'idle' }
@@ -11,6 +12,7 @@ export type SyncStatus =
 export interface SyncManagerOptions {
   baseUrl: string
   adminAuth?: { username: string; password: string }
+  localDbPath?: string
 }
 
 export function getUserDbName(username: string): string {
@@ -20,6 +22,7 @@ export function getUserDbName(username: string): string {
 export class SyncManager extends EventEmitter {
   private baseUrl: string
   private adminAuth?: { username: string; password: string }
+  private localDbPath?: string
   private local?: PouchDB.Database
   private remote?: PouchDB.Database
   private handle?: PouchDB.Replication.Sync<{}>
@@ -29,6 +32,7 @@ export class SyncManager extends EventEmitter {
     super()
     this.baseUrl = options.baseUrl
     this.adminAuth = options.adminAuth
+    this.localDbPath = options.localDbPath
   }
 
   get currentUser(): string | undefined {
@@ -43,7 +47,9 @@ export class SyncManager extends EventEmitter {
     console.log('[db] switchToUser', username)
     this.stop()
 
-    const localName = `cc-remote-${username}`
+    const localName = this.localDbPath
+      ? join(this.localDbPath, `cc-remote-${username}`)
+      : `cc-remote-${username}`
     const remoteName = getUserDbName(username)
 
     this.local = new PouchDB(localName)

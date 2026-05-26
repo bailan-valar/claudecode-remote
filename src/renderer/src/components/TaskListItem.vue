@@ -160,11 +160,6 @@ function onDragEnd(e: DragEvent) {
   }
   emit('dragend', e)
 }
-
-function onStatusTransition(status: TaskStatus) {
-  emit('transition', status)
-  closeDropdown()
-}
 </script>
 
 <template>

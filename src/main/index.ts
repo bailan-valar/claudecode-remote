@@ -100,6 +100,7 @@ function createWindow(): BrowserWindow {
 
 export const syncManager = new SyncManager({
   baseUrl: couchBaseUrl,
+  localDbPath: app.getPath('userData'),
   adminAuth:
     (process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD)
       ? {
@@ -138,8 +139,9 @@ app.whenReady().then(async () => {
 
   // 初始化默认本地数据库
   const localName = getLocalDbName()
-  defaultLocalDb = new PouchDB(localName)
-  console.log('[main] default local db initialized:', localName)
+  const localDbPath = join(app.getPath('userData'), localName)
+  defaultLocalDb = new PouchDB(localDbPath)
+  console.log('[main] default local db initialized:', localDbPath)
 
   // 启动 Web 服务器
   try {
@@ -185,13 +187,6 @@ app.whenReady().then(async () => {
   engine.on('status', (status) => broadcast('engine:status', status))
   engine.on('task:completed', (taskId, result) => {
     broadcast('engine:task:completed', taskId, result)
-    // 任务完成后触发重启逻辑
-    console.log(`[main] Task ${taskId} completed, considering restart...`)
-
-    // 检查任务结果，根据决定是否重启
-    if (result.success) {
-      restartManager.scheduleRestart(`Task ${taskId} completed successfully`, [taskId])
-    }
   })
   engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
   engine.on('task:logs_updated', (taskId, logs) => broadcast('engine:task:logs_updated', taskId, logs))

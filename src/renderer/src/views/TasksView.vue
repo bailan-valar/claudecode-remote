@@ -217,7 +217,7 @@ onUnmounted(() => {
         :project-name-map="projectNameMap"
         :tick="tick"
         :mode="listDensity"
-        @transition="taskStore.updateStatus($event[0], $event[1] as TaskStatus)"
+        @transition="handleMove"
         @edit="openEditDialog($event)"
         @delete="deletingTaskId = $event"
         @add-subtask="handleAddSubtask"
