@@ -51,6 +51,7 @@ function handleTransition(taskId: string, status: TaskStatus) {
     :depth="depth"
     :has-children="hasChildren"
     :is-expanded="isExpanded"
+    :all-tasks="allTasks"
     @toggle="emit('toggle', $event)"
     @transition="emit('transition', task._id, $event)"
     @edit="emit('edit', task._id)"

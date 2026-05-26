@@ -10,7 +10,7 @@ import { createProjectRepository } from '../repositories/projectRepository'
 import { sendWecomMessage, buildTaskCompletedMarkdown, buildTaskFailedMarkdown, buildMentionTextMessage } from './wecomNotifier'
 import { computeTimeTrackingChanges } from '../utils/taskTimeTracking'
 import type { Task } from '../../shared/types'
-import { TASK_STATUS } from '../../shared/constants'
+import { TASK_STATUS, type TaskStatus } from '../../shared/constants'
 
 const DEFAULT_BASE_URL = process.env.APP_BASE_URL || 'https://remote-dev.capdien.site/#/'
 
@@ -169,18 +169,41 @@ export class TaskEngine extends EventEmitter {
 
     this.changesFeed = this.db
       .changes({ live: true, since: 'now', include_docs: true })
-      .on('change', (change) => {
+      .on('change', async (change) => {
         const doc = change.doc as any
         if (!doc || doc.type !== 'task') return
 
+        const task = doc as Task
+
         // 更严格的状态检查，避免重复入队
-        const shouldEnqueue = (doc.status === TASK_STATUS.PENDING || doc.status === TASK_STATUS.PLAN_REQUIRED) &&
-                             !this.runningTasks.has(doc._id) &&
-                             !this.queuedTaskIds.has(doc._id) &&
-                             !this.taskEnqueueLocks.has(doc._id)
+        const shouldEnqueue = (task.status === TASK_STATUS.PENDING || task.status === TASK_STATUS.PLAN_REQUIRED) &&
+                             !this.runningTasks.has(task._id) &&
+                             !this.queuedTaskIds.has(task._id) &&
+                             !this.taskEnqueueLocks.has(task._id)
 
         if (shouldEnqueue) {
-          this._enqueue(doc as Task)
+          this._enqueue(task)
+        }
+
+        // 如果任务状态变为完成状态，检查是否有依赖它的任务需要入队
+        if (isTaskCompleted(task.status)) {
+          const taskRepo = createTaskRepository(this.db)
+          try {
+            const allTasks = await taskRepo.findAll()
+            const dependentTasks = allTasks.filter(t =>
+              t.prerequisiteTaskIds?.includes(task._id) &&
+              (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PLAN_REQUIRED) &&
+              !this.runningTasks.has(t._id) &&
+              !this.queuedTaskIds.has(t._id)
+            )
+
+            for (const dependentTask of dependentTasks) {
+              console.log(`[engine] prerequisite task ${task._id} completed, checking dependent task ${dependentTask._id}`)
+              this._enqueue(dependentTask)
+            }
+          } catch (err) {
+            console.error('[engine] error processing dependent tasks:', err)
+          }
         }
       })
       .on('error', (err) => {
@@ -331,6 +354,15 @@ export class TaskEngine extends EventEmitter {
   private async _enqueue(task: Task): Promise<void> {
     if (!this._running) return
 
+    // 检查前置任务是否完成
+    const taskRepo = createTaskRepository(this.db)
+    const prereqCheck = await checkPrerequisitesCompleted(task, taskRepo)
+    if (!prereqCheck.completed) {
+      const blockingTitles = prereqCheck.blockingTasks?.map(t => t.title).join(', ') || 'unknown'
+      console.log(`[engine] task ${task._id} waiting for prerequisites: ${blockingTitles}`)
+      return
+    }
+
     // 获取任务级入队锁，防止同一个任务被并发入队
     const existingLock = this.taskEnqueueLocks.get(task._id)
     if (existingLock) {
@@ -362,6 +394,14 @@ export class TaskEngine extends EventEmitter {
       }
       if (this.queuedTaskIds.has(task._id)) {
         console.log(`[engine] task ${task._id} was queued while waiting for lock, skipping`)
+        return
+      }
+
+      // 再次检查前置任务（可能在等待锁的过程中前置任务完成了）
+      const latestPrereqCheck = await checkPrerequisitesCompleted(task, taskRepo)
+      if (!latestPrereqCheck.completed) {
+        const blockingTitles = latestPrereqCheck.blockingTasks?.map(t => t.title).join(', ') || 'unknown'
+        console.log(`[engine] task ${task._id} prerequisites still not complete: ${blockingTitles}`)
         return
       }
 

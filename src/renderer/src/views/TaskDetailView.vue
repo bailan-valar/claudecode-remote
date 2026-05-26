@@ -138,6 +138,23 @@ const parentTask = computed(() => {
   return taskStore.tasks.find((t) => t._id === task.value!.parentTaskId)
 })
 
+// 前置任务
+const prerequisiteTasks = computed(() => {
+  if (!task.value?.prerequisiteTaskIds || task.value.prerequisiteTaskIds.length === 0) return []
+  return taskStore.tasks.filter((t) => task.value!.prerequisiteTaskIds!.includes(t._id))
+})
+
+// 前置任务是否都已完成
+const prerequisiteTasksCompleted = computed(() => {
+  if (prerequisiteTasks.value.length === 0) return true
+  return prerequisiteTasks.value.every((t) =>
+    t.status === TASK_STATUS.REVIEWING ||
+    t.status === TASK_STATUS.PLAN_REVIEWING ||
+    t.status === TASK_STATUS.COMPLETED ||
+    t.status === TASK_STATUS.CLOSED
+  )
+})
+
 // 执行阶段列表（倒序排列，最新的在最上面）
 const executionPhases = computed(() => {
   if (!task.value) return []
@@ -518,6 +535,26 @@ watch(() => task.value?.logs, () => {
           </RouterLink>
         </span>
       </div>
+      <div v-if="prerequisiteTasks.length > 0" class="info-row">
+        <span class="info-label">前置任务</span>
+        <div class="info-value">
+          <div v-if="!prerequisiteTasksCompleted" class="prerequisite-warning">
+            <span class="warning-icon">⚠️</span>
+            <span>前置任务未完成，无法开始执行</span>
+          </div>
+          <div class="prerequisite-list">
+            <RouterLink
+              v-for="prereq in prerequisiteTasks"
+              :key="prereq._id"
+              :to="{ name: 'task-detail', params: { id: prereq._id } }"
+              class="prerequisite-link"
+            >
+              <StatusBadge :status="prereq.status" />
+              <span>{{ prereq.title }}</span>
+            </RouterLink>
+          </div>
+        </div>
+      </div>
       <div class="info-row">
         <span class="info-label">描述</span>
         <span class="info-value">{{ task.description || '无' }}</span>
@@ -576,6 +613,7 @@ watch(() => task.value?.logs, () => {
           :key="ct._id"
           mode="compact"
           :task="ct"
+          :all-tasks="taskStore.tasks"
           @edit="openEditDialog($event)"
           @delete="deletingChildTaskId = $event"
         />
@@ -908,6 +946,46 @@ header .more-icon {
 
 .parent-link:hover {
   text-decoration: underline;
+}
+
+/* ── 前置任务 ── */
+.prerequisite-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: rgba(255, 149, 10, 0.1);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 149, 10, 0.3);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-sm);
+}
+
+.warning-icon {
+  font-size: 1rem;
+}
+
+.prerequisite-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.prerequisite-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background var(--transition-fast);
+  font-size: 0.875rem;
+}
+
+.prerequisite-link:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 /* ── 子任务列表 ── */

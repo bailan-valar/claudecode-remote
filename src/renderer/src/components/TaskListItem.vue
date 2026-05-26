@@ -3,7 +3,7 @@ import { RouterLink } from 'vue-router'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Task } from '../../../shared/types'
 import type { TaskStatus } from '../../../shared/constants'
-import { KIND_LABEL } from '../../../shared/constants'
+import { TASK_STATUS, KIND_LABEL } from '../../../shared/constants'
 import { getAllowedNext } from '../utils/taskTransitions'
 import StatusBadge from './StatusBadge.vue'
 import TaskStatusActions from './TaskStatusActions.vue'
@@ -22,6 +22,7 @@ interface Props {
   depth?: number // 树形缩进层级
   hasChildren?: boolean // 是否有子任务
   isExpanded?: boolean // 是否已展开
+  allTasks?: Task[] // 所有任务列表，用于检查前置任务状态
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -31,6 +32,23 @@ const props = withDefaults(defineProps<Props>(), {
   depth: 0,
   hasChildren: false,
   isExpanded: false,
+  allTasks: () => [],
+})
+
+// 检查前置任务是否完成
+const hasIncompletePrerequisites = computed(() => {
+  if (!props.task.prerequisiteTaskIds || props.task.prerequisiteTaskIds.length === 0) return false
+  if (!props.allTasks || props.allTasks.length === 0) return false
+
+  return props.task.prerequisiteTaskIds.some(prereqId => {
+    const prereqTask = props.allTasks.find(t => t._id === prereqId)
+    if (!prereqTask) return false
+    const isCompleted = prereqTask.status === TASK_STATUS.REVIEWING ||
+                       prereqTask.status === TASK_STATUS.PLAN_REVIEWING ||
+                       prereqTask.status === TASK_STATUS.COMPLETED ||
+                       prereqTask.status === TASK_STATUS.CLOSED
+    return !isCompleted
+  })
 })
 
 // 响应式的移动端检测
@@ -185,8 +203,10 @@ function onDragEnd(e: DragEvent) {
       <RouterLink
         :to="{ name: 'task-detail', params: { id: task._id } }"
         class="title"
+        :class="{ 'title-blocked': hasIncompletePrerequisites }"
         @click="emit('navigate', task._id)"
       >
+        <span v-if="hasIncompletePrerequisites" class="prerequisite-warning-icon" title="前置任务未完成">⚠️</span>
         {{ task.title }}
       </RouterLink>
       <div class="task-header">
@@ -478,6 +498,17 @@ function onDragEnd(e: DragEvent) {
 
 .task-list-item .title:hover {
   color: var(--color-accent);
+}
+
+.task-list-item .title-blocked {
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.task-list-item .prerequisite-warning-icon {
+  margin-right: var(--space-xs);
+  font-size: 0.9em;
+  animation: pulse 2s infinite;
 }
 
 .task-list-item .kind-badge {

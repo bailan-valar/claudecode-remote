@@ -87,6 +87,7 @@ function onDrop(e: DragEvent, status: TaskStatus) {
           :project-name="projectNameMap.get(task.projectId) ?? task.projectId"
           :tick="tick"
           :draggable="true"
+          :all-tasks="tasks"
           @dragstart="onDragStart"
           @edit="emit('edit', $event)"
           @delete="emit('delete', $event)"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useTaskStore } from '../stores/useTaskStore'
+import StatusBadge from './StatusBadge.vue'
 import type { Project, Task } from '../../../shared/types'
 import { TASK_STATUS, TASK_KIND, KIND_LABEL } from '../../../shared/constants'
 import { STATUS_LABEL } from '../utils/taskTransitions'
@@ -26,6 +27,7 @@ const parentTaskId = ref<string | null>(null)
 const status = ref<Task['status']>('pending')
 const kind = ref<Task['kind']>('task')
 const isPlan = ref(false)
+const prerequisiteTaskIds = ref<string[]>([])
 
 const isEdit = computed(() => props.mode === 'edit')
 
@@ -38,6 +40,22 @@ const eligibleParentTasks = computed(() => {
   )
 })
 
+// 可选的前置任务（同项目、非父任务、非自身、非子任务）
+const eligiblePrerequisiteTasks = computed(() => {
+  if (!projectId.value) return []
+  return (props.tasks ?? []).filter((t) => {
+    // 排除自身
+    if (t._id === props.initialTask?._id) return false
+    // 排除父任务
+    if (t._id === parentTaskId.value) return false
+    // 排除子任务
+    if (t.parentTaskId === props.initialTask?._id) return false
+    // 同项目
+    if (t.projectId !== projectId.value) return false
+    return true
+  })
+})
+
 watch(() => props.initialTask, (t) => {
   if (t) {
     title.value = t.title
@@ -47,6 +65,7 @@ watch(() => props.initialTask, (t) => {
     status.value = t.status
     kind.value = t.kind ?? 'task'
     isPlan.value = t.isPlan ?? false
+    prerequisiteTaskIds.value = t.prerequisiteTaskIds ?? []
   } else if (props.defaultProjectId) {
     projectId.value = props.defaultProjectId
     if (props.defaultParentTaskId) {
@@ -78,6 +97,12 @@ async function handleSubmit() {
     if (status.value !== props.initialTask!.status) changes.status = status.value
     if (kind.value !== (props.initialTask!.kind ?? 'task')) changes.kind = kind.value
     if (isPlan.value !== (props.initialTask!.isPlan ?? false)) changes.isPlan = isPlan.value
+    // 比较前置任务数组
+    const currentPrereqs = props.initialTask!.prerequisiteTaskIds ?? []
+    const newPrereqs = prerequisiteTaskIds.value
+    if (JSON.stringify(currentPrereqs.sort()) !== JSON.stringify(newPrereqs.sort())) {
+      changes.prerequisiteTaskIds = newPrereqs.length > 0 ? newPrereqs : undefined
+    }
     emit('submit', changes)
     return
   }
@@ -89,6 +114,7 @@ async function handleSubmit() {
     status: status.value,
     kind: kind.value,
     isPlan: isPlan.value,
+    prerequisiteTaskIds: prerequisiteTaskIds.value.length > 0 ? prerequisiteTaskIds.value : undefined,
   })
   if (result.ok) {
     title.value = ''
@@ -98,6 +124,7 @@ async function handleSubmit() {
     status.value = 'pending'
     kind.value = 'task'
     isPlan.value = false
+    prerequisiteTaskIds.value = []
     emit('submit')
   }
 }
@@ -124,6 +151,24 @@ async function handleSubmit() {
         <option :value="null">无父任务</option>
         <option v-for="t in eligibleParentTasks" :key="t._id" :value="t._id">{{ t.title }}</option>
       </select>
+    </div>
+
+    <div v-if="eligiblePrerequisiteTasks.length" class="form-group">
+      <label class="form-label">前置任务</label>
+      <div class="prerequisite-tasks">
+        <div v-for="t in eligiblePrerequisiteTasks" :key="t._id" class="prerequisite-item">
+          <label class="prerequisite-check">
+            <input
+              v-model="prerequisiteTaskIds"
+              type="checkbox"
+              :value="t._id"
+            />
+            <span>{{ t.title }}</span>
+            <StatusBadge :status="t.status" class="task-status" />
+          </label>
+        </div>
+      </div>
+      <p class="form-hint">前置任务完成后才能开始执行当前任务</p>
     </div>
 
     <div class="form-row">
@@ -235,6 +280,62 @@ async function handleSubmit() {
   height: 18px;
   cursor: pointer;
   accent-color: var(--color-accent);
+}
+
+.prerequisite-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+}
+
+.prerequisite-item {
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.prerequisite-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.prerequisite-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+  flex-wrap: wrap;
+}
+
+.prerequisite-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+}
+
+.prerequisite-check span {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.task-status {
+  font-size: 0.75rem;
+}
+
+.form-hint {
+  margin: var(--space-xs) 0 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
 }
 
 @media (max-width: 640px) {
