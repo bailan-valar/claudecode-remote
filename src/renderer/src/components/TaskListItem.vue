@@ -236,7 +236,7 @@ function onDragEnd(e: DragEvent) {
             @transition="onStatusTransition"
             @add-subtask="emit('addSubtask', $event); closeDropdown()"
             @delete="emit('delete', $event); closeDropdown()"
-            @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+            @toggle-submenu="showStatusSubmenu = $event"
             @close="closeDropdown()"
           />
         </div>
@@ -296,7 +296,7 @@ function onDragEnd(e: DragEvent) {
           @transition="onStatusTransition"
           @add-subtask="emit('addSubtask', $event); closeDropdown()"
           @delete="emit('delete', $event); closeDropdown()"
-          @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+          @toggle-submenu="showStatusSubmenu = $event"
           @close="closeDropdown()"
         />
       </div>
@@ -359,7 +359,7 @@ function onDragEnd(e: DragEvent) {
           @transition="onStatusTransition"
           @add-subtask="emit('addSubtask', $event); closeDropdown()"
           @delete="emit('delete', $event); closeDropdown()"
-          @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+          @toggle-submenu="showStatusSubmenu = $event"
           @close="closeDropdown()"
         />
       </div>

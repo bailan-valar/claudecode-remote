@@ -29,6 +29,7 @@ export const TASK_KIND = {
   STORY: 'story',
   BUG: 'bug',
   TASK: 'task',
+  CHAT: 'chat',
 } as const
 
 export type TaskStatus = (typeof TASK_STATUS)[keyof typeof TASK_STATUS]
@@ -41,6 +42,7 @@ export const KIND_LABEL: Record<TaskKind, string> = {
   story: '故事',
   bug: '缺陷',
   task: '任务',
+  chat: '对话',
 }
 
 export const ENGINE_PROVIDER = {

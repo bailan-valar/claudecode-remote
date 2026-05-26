@@ -82,12 +82,17 @@ function onCreateSubtask() {
         编辑
       </button>
       <div class="dropdown-divider"></div>
-      <button class="dropdown-item has-submenu" @click.stop="onToggleSubmenu">
+      <button
+        class="dropdown-item has-submenu"
+        @click.stop="onToggleSubmenu"
+        @mouseenter="emit('toggleSubmenu', true)"
+        @mouseleave="emit('toggleSubmenu', false)"
+      >
         <span class="dropdown-icon">🔀</span>
         修改状态
         <span class="submenu-arrow">{{ showStatusSubmenu ? '▼' : '▶' }}</span>
       </button>
-      <div v-show="showStatusSubmenu" class="dropdown-submenu">
+      <div v-show="showStatusSubmenu" class="dropdown-submenu" @mouseenter="emit('toggleSubmenu', true)" @mouseleave="emit('toggleSubmenu', false)">
         <button
           v-for="s in nextStates"
           :key="s"
