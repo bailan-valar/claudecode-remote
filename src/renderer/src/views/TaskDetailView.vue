@@ -450,7 +450,7 @@ watch(() => task.value?.logs, () => {
             @append="showAppendPanel = true"
             @create-subtask="showSubtaskPanel = true"
             @delete="showDeleteConfirm = true"
-            @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
+            @toggle-submenu="showStatusSubmenu = $event"
             @close="closeDropdown"
           />
         </div>

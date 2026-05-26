@@ -22,7 +22,7 @@ const emit = defineEmits<{
   transition: [status: TaskStatus]
   addSubtask: [taskId: string]
   delete: [taskId: string]
-  toggleSubmenu: []
+  toggleSubmenu: [show: boolean]
   close: []
   append: []
   createSubtask: [taskId: string]
@@ -49,7 +49,8 @@ function onDelete() {
 }
 
 function onToggleSubmenu() {
-  emit('toggleSubmenu')
+  // 点击时切换子菜单显示状态，保持兼容性
+  emit('toggleSubmenu', !props.showStatusSubmenu)
 }
 
 function onAppend() {
@@ -216,6 +217,8 @@ function onCreateSubtask() {
   margin: 0 10px;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   overflow: hidden;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transform-origin: top left;
 }
 
 .task-item-dropdown-menu.compact .dropdown-submenu {
