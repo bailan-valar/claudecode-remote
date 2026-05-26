@@ -40,11 +40,16 @@ const subtaskParentId = ref<string | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
 
 // 新增项目列表相关状态
-const showProjectSidebar = ref(true)
+const showProjectSidebar = ref(localStorage.getItem('showProjectSidebar') !== 'false')
 const showNewProjectForm = ref(false)
 
 // 控制是否隐藏聊天中的工具调用及结果（从本地存储读取偏好）
 const hideChatToolCalls = ref(localStorage.getItem('hideChatToolCalls') === 'true')
+
+// 监听侧边栏状态变化，保存到本地存储
+watch(showProjectSidebar, (newValue) => {
+  localStorage.setItem('showProjectSidebar', String(newValue))
+})
 
 // 监听变化，保存到本地存储
 watch(hideChatToolCalls, (newValue) => {
@@ -573,7 +578,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!project" class="loading">加载中...</div>
+  <div v-if="!project" class="empty-state">
+    <div class="empty-content">
+      <h2>项目未找到</h2>
+      <p>该项目可能已被删除或不存在。</p>
+      <div class="empty-actions">
+        <button v-if="projectStore.projects.length > 0" class="glass-button primary" @click="router.push({ name: 'project-detail', params: { id: projectStore.projects[0]._id } })">
+          查看第一个项目
+        </button>
+        <button class="glass-button" @click="router.push({ name: 'home' })">
+          返回首页
+        </button>
+      </div>
+    </div>
+  </div>
   <div v-else class="project-detail-container">
     <!-- 左侧项目切换面板 -->
     <aside v-if="showProjectSidebar" class="project-sidebar glass">
@@ -1083,6 +1101,38 @@ onUnmounted(() => {
   padding: var(--space-xl);
   text-align: center;
   color: var(--color-text-secondary);
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: var(--space-xl);
+}
+
+.empty-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.empty-content h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-md);
+}
+
+.empty-content p {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-lg);
+  font-size: 1rem;
+}
+
+.empty-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: center;
 }
 
 header {

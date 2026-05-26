@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Teleport } from 'vue'
+import { Teleport, computed } from 'vue'
 import type { Task } from '../../../shared/types'
 import type { TaskStatus } from '../../../shared/constants'
 import { TRANSITION_LABEL, STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
@@ -28,6 +28,17 @@ const emit = defineEmits<{
   createSubtask: [taskId: string]
 }>()
 
+// 计算状态菜单的位置（在主菜单右侧）
+const statusMenuStyle = computed(() => {
+  const right = parseFloat(props.dropdownStyle.right)
+  const top = parseFloat(props.dropdownStyle.top)
+
+  return {
+    top: `${top}px`,
+    right: `${right + 180}px`, // 在主菜单右侧180px处
+  }
+})
+
 function onEdit() {
   emit('edit', props.task._id)
   emit('close')
@@ -48,11 +59,6 @@ function onDelete() {
   emit('close')
 }
 
-function onToggleSubmenu() {
-  // 点击时切换子菜单显示状态，保持兼容性
-  emit('toggleSubmenu', !props.showStatusSubmenu)
-}
-
 function onAppend() {
   emit('append')
   emit('close')
@@ -66,6 +72,7 @@ function onCreateSubtask() {
 
 <template>
   <Teleport to="body">
+    <!-- 主下拉菜单 -->
     <div
       class="task-item-dropdown-menu"
       :class="{ compact }"
@@ -85,28 +92,13 @@ function onCreateSubtask() {
       <div class="dropdown-divider"></div>
       <button
         class="dropdown-item has-submenu"
-        @click.stop="onToggleSubmenu"
         @mouseenter="emit('toggleSubmenu', true)"
         @mouseleave="emit('toggleSubmenu', false)"
       >
         <span class="dropdown-icon">🔀</span>
         修改状态
-        <span class="submenu-arrow">{{ showStatusSubmenu ? '▼' : '▶' }}</span>
+        <span class="submenu-arrow">▶</span>
       </button>
-      <div v-show="showStatusSubmenu" class="dropdown-submenu" @mouseenter="emit('toggleSubmenu', true)" @mouseleave="emit('toggleSubmenu', false)">
-        <button
-          v-for="s in nextStates"
-          :key="s"
-          class="dropdown-item submenu-item"
-          @click.stop="onTransition(s)"
-        >
-          <span class="status-dot" :style="{ backgroundColor: STATUS_COLOR[s] }"></span>
-          {{ TRANSITION_LABEL[s] || STATUS_LABEL[s] }}
-        </button>
-        <div v-if="nextStates.length === 0" class="dropdown-item submenu-item disabled">
-          无可用状态
-        </div>
-      </div>
       <div class="dropdown-divider"></div>
       <button v-if="showSubtask" class="dropdown-item" @click="onCreateSubtask">
         <span class="dropdown-icon">📋</span>
@@ -121,6 +113,33 @@ function onCreateSubtask() {
         <span class="dropdown-icon">🗑️</span>
         删除
       </button>
+    </div>
+
+    <!-- 右侧独立状态菜单 -->
+    <div
+      v-show="showDropdown && showStatusSubmenu"
+      class="status-side-menu"
+      :class="{ compact }"
+      :style="statusMenuStyle"
+      @mouseenter="emit('toggleSubmenu', true)"
+      @mouseleave="emit('toggleSubmenu', false)"
+      @click.stop
+    >
+      <div class="status-menu-header">选择状态</div>
+      <div class="status-menu-items">
+        <button
+          v-for="s in nextStates"
+          :key="s"
+          class="status-menu-item"
+          @click.stop="onTransition(s)"
+        >
+          <span class="status-dot" :style="{ backgroundColor: STATUS_COLOR[s] }"></span>
+          <span class="status-label">{{ TRANSITION_LABEL[s] || STATUS_LABEL[s] }}</span>
+        </button>
+        <div v-if="nextStates.length === 0" class="status-menu-item disabled">
+          无可用状态
+        </div>
+      </div>
     </div>
   </Teleport>
 </template>
@@ -211,31 +230,85 @@ function onCreateSubtask() {
   color: var(--color-text-secondary);
 }
 
-.dropdown-submenu {
-  background: rgba(0, 0, 0, 0.02);
-  border-left: 2px solid var(--color-accent);
-  margin: 0 10px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+/* 右侧独立状态菜单 */
+.status-side-menu {
+  position: fixed;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  min-width: 160px;
+  z-index: 1000;
   overflow: hidden;
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
-  transform-origin: top left;
+  animation: menuSlideIn 0.2s ease-out;
 }
 
-.task-item-dropdown-menu.compact .dropdown-submenu {
-  margin: 0 6px;
+.status-side-menu.compact {
+  min-width: 140px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
-.submenu-item {
-  padding-left: calc(14px + 16px);
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.status-menu-header {
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.status-side-menu.compact .status-menu-header {
+  padding: 6px 10px;
+  font-size: 0.6875rem;
+}
+
+.status-menu-items {
+  padding: 4px 0;
+}
+
+.status-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.status-side-menu.compact .status-menu-item {
+  gap: 8px;
+  padding: 7px 10px;
   font-size: 0.875rem;
 }
 
-.task-item-dropdown-menu.compact .submenu-item {
-  padding-left: calc(10px + 14px);
-  font-size: 0.8125rem;
+.status-menu-item:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 
-.submenu-item.disabled {
+.status-menu-item.disabled {
   color: var(--color-text-secondary);
   cursor: not-allowed;
   opacity: 0.6;
@@ -246,6 +319,10 @@ function onCreateSubtask() {
   height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.status-label {
+  flex: 1;
 }
 
 .dropdown-icon {
@@ -271,8 +348,18 @@ function onCreateSubtask() {
     font-size: 1rem;
   }
 
-  .submenu-item {
-    font-size: 0.9375rem;
+  .status-side-menu {
+    min-width: 150px;
+  }
+
+  .status-menu-item {
+    padding: 10px 14px;
+    font-size: 1rem;
+  }
+
+  .status-menu-header {
+    padding: 6px 14px;
+    font-size: 0.6875rem;
   }
 }
 </style>
