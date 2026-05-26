@@ -160,28 +160,6 @@ export function startWebServer(): void {
       try {
         const body = req.method !== 'GET' && req.method !== 'DELETE' ? await readBody(req) : {}
 
-        // Auth
-        if (pathname === '/api/auth/login' && req.method === 'POST') {
-          const result = await api.loginAction(body.username, body.password)
-          sendJson(res, 200, result)
-          return
-        }
-        if (pathname === '/api/auth/register' && req.method === 'POST') {
-          const result = await api.registerAction(body.username, body.password)
-          sendJson(res, 200, result)
-          return
-        }
-        if (pathname === '/api/auth/logout' && req.method === 'POST') {
-          const result = await api.logoutAction()
-          sendJson(res, 200, result)
-          return
-        }
-        if (pathname === '/api/auth/session' && req.method === 'GET') {
-          const result = await api.getSessionAction()
-          sendJson(res, 200, result)
-          return
-        }
-
         // Projects
         if (pathname === '/api/projects' && req.method === 'GET') {
           const result = await api.listProjectsAction()
@@ -330,7 +308,16 @@ export function startWebServer(): void {
         }
 
         if (pathname === '/api/data/import' && req.method === 'POST') {
+          console.log('[webServer] /api/data/import received:', { hasData: !!body.data, hasOptions: !!body.options })
           const result = await api.importDataAction(body.data, body.options)
+          console.log('[webServer] /api/data/import result:', { ok: result.ok, error: result.error, result: result.result })
+          sendJson(res, 200, result)
+          return
+        }
+
+        // Instance Info
+        if (pathname === '/api/instance/info' && req.method === 'GET') {
+          const result = await api.getInstanceInfoAction()
           sendJson(res, 200, result)
           return
         }
@@ -376,6 +363,107 @@ export function startWebServer(): void {
         if (pathname === '/api/config/test-couchdb' && req.method === 'POST') {
           const result = await api.testCouchdbConnectionAction(body)
           sendJson(res, 200, result)
+          return
+        }
+
+        // LLM Providers
+        if (pathname === '/api/llm/providers' && req.method === 'GET') {
+          const { loadLlmProviders } = await import('./configStore')
+          try {
+            const providers = loadLlmProviders()
+            sendJson(res, 200, { ok: true, providers })
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '加载 Provider 列表失败' })
+          }
+          return
+        }
+
+        if (pathname.startsWith('/api/llm/providers/') && req.method === 'GET') {
+          const { getLlmProvider } = await import('./configStore')
+          const id = pathname.slice('/api/llm/providers/'.length)
+          if (id === 'default') {
+            const { getDefaultLlmProvider } = await import('./configStore')
+            try {
+              const provider = getDefaultLlmProvider()
+              if (!provider) {
+                sendJson(res, 404, { ok: false, error: '没有可用的 Provider' })
+              } else {
+                sendJson(res, 200, { ok: true, provider })
+              }
+            } catch (err: any) {
+              sendJson(res, 500, { ok: false, error: err.message || '获取默认 Provider 失败' })
+            }
+          } else {
+            try {
+              const provider = getLlmProvider(id)
+              if (!provider) {
+                sendJson(res, 404, { ok: false, error: 'Provider 不存在' })
+              } else {
+                sendJson(res, 200, { ok: true, provider })
+              }
+            } catch (err: any) {
+              sendJson(res, 500, { ok: false, error: err.message || '获取 Provider 失败' })
+            }
+          }
+          return
+        }
+
+        if (pathname === '/api/llm/providers' && req.method === 'POST') {
+          const { addLlmProvider } = await import('./configStore')
+          try {
+            const provider = addLlmProvider(body)
+            sendJson(res, 200, { ok: true, provider })
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '添加 Provider 失败' })
+          }
+          return
+        }
+
+        if (pathname.startsWith('/api/llm/providers/') && req.method === 'PATCH') {
+          const { updateLlmProvider } = await import('./configStore')
+          const id = pathname.slice('/api/llm/providers/'.length)
+          try {
+            const updated = updateLlmProvider(id, body)
+            if (!updated) {
+              sendJson(res, 404, { ok: false, error: 'Provider 不存在' })
+            } else {
+              sendJson(res, 200, { ok: true, provider: updated })
+            }
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '更新 Provider 失败' })
+          }
+          return
+        }
+
+        if (pathname.startsWith('/api/llm/providers/') && pathname.endsWith('/setDefault') && req.method === 'POST') {
+          const { updateLlmProvider } = await import('./configStore')
+          const id = pathname.slice('/api/llm/providers/'.length, -'/setDefault'.length)
+          try {
+            const updated = updateLlmProvider(id, { isDefault: true })
+            if (!updated) {
+              sendJson(res, 404, { ok: false, error: 'Provider 不存在' })
+            } else {
+              sendJson(res, 200, { ok: true, provider: updated })
+            }
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '设置默认 Provider 失败' })
+          }
+          return
+        }
+
+        if (pathname.startsWith('/api/llm/providers/') && req.method === 'DELETE') {
+          const { deleteLlmProvider } = await import('./configStore')
+          const id = pathname.slice('/api/llm/providers/'.length)
+          try {
+            const success = deleteLlmProvider(id)
+            if (!success) {
+              sendJson(res, 404, { ok: false, error: 'Provider 不存在' })
+            } else {
+              sendJson(res, 200, { ok: true })
+            }
+          } catch (err: any) {
+            sendJson(res, 500, { ok: false, error: err.message || '删除 Provider 失败' })
+          }
           return
         }
 

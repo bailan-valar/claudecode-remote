@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
-import { useAuthStore } from './stores/useAuthStore'
 import { useEngineStore } from './stores/useEngineStore'
 import { useRoute } from 'vue-router'
 import { getGlobalKeepAliveManager } from './utils/keepAliveManager'
 
-const auth = useAuthStore()
 const engineStore = useEngineStore() // 确保引擎store全局初始化
 const route = useRoute()
 const isMobile = ref(false)
@@ -18,8 +16,6 @@ function checkMobile() {
 }
 
 onMounted(() => {
-  // checkSession 已在路由守卫中调用，这里不再重复调用
-  // auth.checkSession()
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
@@ -30,17 +26,6 @@ onMounted(() => {
   engineStore.listen()
 })
 
-// 监听用户登录状态，在用户登出时停止引擎监听
-watch(() => auth.currentUser, (currentUser) => {
-  if (!currentUser) {
-    // 用户登出时停止监听
-    engineStore.unlisten()
-  } else {
-    // 用户登录时重新启动监听
-    engineStore.listen()
-  }
-})
-
 // 监听路由变化，动态更新缓存
 watch(() => route.meta, (meta) => {
   const cacheName = meta.cacheName as string || route.name as string
@@ -49,8 +34,8 @@ watch(() => route.meta, (meta) => {
   }
 }, { immediate: true })
 
-const showMobileNav = computed(() => auth.currentUser && isMobile.value)
-const showSidebar = computed(() => auth.currentUser && !isMobile.value)
+const showMobileNav = computed(() => isMobile.value)
+const showSidebar = computed(() => !isMobile.value)
 
 // 计算需要缓存的组件
 const include = computed(() => keepAliveManager.cacheComponents.value.join(','))
@@ -59,7 +44,6 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
 
 <template>
   <div class="app" :class="{ mobile: isMobile }">
-    <template v-if="auth.currentUser">
       <aside v-if="showSidebar" class="sidebar glass">
         <div class="sidebar-brand">
           <span class="brand-icon">◆</span>
@@ -83,10 +67,7 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
           </RouterLink>
         </nav>
         <div class="user">
-          <span class="username">{{ auth.currentUser.username }}</span>
-          <button class="logout-btn" @click="auth.logout()" title="注销">
-            <span class="nav-icon">⎋</span>
-          </button>
+          <span class="username">User</span>
         </div>
       </aside>
       <main class="main">
@@ -116,22 +97,7 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
           <span class="mobile-icon">⚙</span>
           <span class="mobile-label">设置</span>
         </RouterLink>
-        <button class="mobile-nav-item logout" @click="auth.logout()">
-          <span class="mobile-icon">⎋</span>
-          <span class="mobile-label">注销</span>
-        </button>
       </nav>
-    </template>
-    <template v-else>
-      <RouterView v-slot="{ Component }">
-        <template v-if="Component">
-          <keep-alive :include="include" :exclude="exclude">
-            <component :is="Component" :key="$route.fullPath" v-if="$route.meta.keepAlive !== false" />
-          </keep-alive>
-          <component :is="Component" :key="$route.fullPath" v-if="$route.meta.keepAlive === false" />
-        </template>
-      </RouterView>
-    </template>
   </div>
 </template>
 
@@ -229,25 +195,6 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
   white-space: nowrap;
 }
 
-.logout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-muted);
-  border: none;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.logout-btn:hover {
-  background: rgba(255, 59, 48, 0.1);
-  color: var(--color-error);
-}
-
 /* ── 主内容区 ── */
 .main {
   flex: 1;
@@ -282,8 +229,7 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
   border-radius: var(--radius-xl);
 }
 
-.mobile-nav-item,
-.mobile-nav .logout {
+.mobile-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -310,11 +256,6 @@ const exclude = computed(() => keepAliveManager.excludeComponents.value.join(','
   background: var(--glass-bg-strong);
   color: var(--color-accent);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
-}
-
-.mobile-nav-item.logout:hover {
-  background: rgba(255, 59, 48, 0.1);
-  color: var(--color-error);
 }
 
 .mobile-icon {

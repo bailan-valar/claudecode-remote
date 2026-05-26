@@ -1,14 +1,15 @@
 import 'dotenv/config'
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
+import PouchDB from 'pouchdb'
 import { SyncManager } from './db'
-import { AuthManager } from './auth'
 import { registerIpcHandlers } from './ipc'
 import { TaskEngine } from './engine/taskEngine'
 import { loadEngineState } from './engineState'
 import { broadcast } from './events'
-import { getSessionAction } from './apiActions'
 import { getConfig, type AppConfig } from './configStore'
+import { randomUUID } from 'crypto'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 
 // 优先使用环境变量（开发时），否则使用配置文件（打包后）
 const config = getConfig()
@@ -16,6 +17,37 @@ const couchBaseUrl =
   process.env.COUCHDB_URL?.replace(/\/[^/]*$/, '') ||
   config.couchDbUrl?.replace(/\/[^/]*$/, '') ||
   'http://localhost:5984'
+
+// 获取/创建实例 ID
+const INSTANCE_ID_FILE = join(app.getPath('userData'), 'instance-id.json')
+
+interface InstanceId {
+  id: string
+  createdAt: string
+}
+
+function getInstanceId(): string {
+  if (existsSync(INSTANCE_ID_FILE)) {
+    try {
+      const data = JSON.parse(readFileSync(INSTANCE_ID_FILE, 'utf-8')) as InstanceId
+      return data.id
+    } catch {
+      // ignore
+    }
+  }
+  // 生成新的实例ID
+  const newInstance: InstanceId = {
+    id: randomUUID(),
+    createdAt: new Date().toISOString()
+  }
+  writeFileSync(INSTANCE_ID_FILE, JSON.stringify(newInstance, null, 2))
+  return newInstance.id
+}
+
+function getLocalDbName(): string {
+  const instanceId = getInstanceId()
+  return `cc-remote-${instanceId.slice(0, 8)}`
+}
 
 let engine: TaskEngine | null = null
 
@@ -41,6 +73,7 @@ function createWindow(): BrowserWindow {
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow.maximize()
     mainWindow.show()
   })
 
@@ -88,35 +121,25 @@ syncManager.on('status', (status) => {
   }
 })
 
-export const authManager = new AuthManager({
-  baseUrl: couchBaseUrl,
-  adminAuth:
-    (process.env.COUCHDB_ADMIN_USER && process.env.COUCHDB_ADMIN_PASSWORD)
-      ? {
-          username: process.env.COUCHDB_ADMIN_USER,
-          password: process.env.COUCHDB_ADMIN_PASSWORD,
-        }
-      : (config.couchDbAdminUser && config.couchDbAdminPassword)
-        ? {
-            username: config.couchDbAdminUser,
-            password: config.couchDbAdminPassword,
-          }
-        : undefined,
-})
+// 自动初始化默认本地数据库
+let defaultLocalDb: PouchDB.Database | null = null
+
+export function getDefaultLocalDb(): PouchDB.Database | null {
+  return defaultLocalDb
+}
+
+export function setDefaultLocalDb(db: PouchDB.Database | null): void {
+  defaultLocalDb = db
+}
 
 app.whenReady().then(async () => {
   const win = createWindow()
   registerIpcHandlers(win)
 
-  // 尝试从本地加密存储恢复登录态
-  try {
-    const sessionResult = await getSessionAction()
-    if (sessionResult.user) {
-      console.log('[main] auto-login restored:', sessionResult.user.username)
-    }
-  } catch (err: any) {
-    console.error('[main] auto-login failed:', err.message)
-  }
+  // 初始化默认本地数据库
+  const localName = getLocalDbName()
+  defaultLocalDb = new PouchDB(localName)
+  console.log('[main] default local db initialized:', localName)
 
   // 启动 Web 服务器
   try {
@@ -156,28 +179,25 @@ app.whenReady().then(async () => {
     restartManager.clearRestartState()
   }
 
-  // 启动任务引擎（若用户已登录且上次未手动停止）
-  const db = syncManager.getLocalDb()
-  if (db) {
-    const state = loadEngineState()
-    engine = new TaskEngine({ db, concurrency: state.concurrency ?? 1, provider: state.provider })
-    engine.on('status', (status) => broadcast('engine:status', status))
-    engine.on('task:completed', (taskId, result) => {
-      broadcast('engine:task:completed', taskId, result)
-      // 任务完成后触发重启逻辑
-      console.log(`[main] Task ${taskId} completed, considering restart...`)
+  // 启动任务引擎
+  const state = loadEngineState()
+  engine = new TaskEngine({ db: defaultLocalDb, concurrency: state.concurrency ?? 1, provider: state.provider })
+  engine.on('status', (status) => broadcast('engine:status', status))
+  engine.on('task:completed', (taskId, result) => {
+    broadcast('engine:task:completed', taskId, result)
+    // 任务完成后触发重启逻辑
+    console.log(`[main] Task ${taskId} completed, considering restart...`)
 
-      // 检查任务结果，根据决定是否重启
-      if (result.success) {
-        restartManager.scheduleRestart(`Task ${taskId} completed successfully`, [taskId])
-      }
-    })
-    engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
-    engine.on('task:logs_updated', (taskId, logs) => broadcast('engine:task:logs_updated', taskId, logs))
-    setEngine(engine)
-    if (state.running) {
-      engine.start()
+    // 检查任务结果，根据决定是否重启
+    if (result.success) {
+      restartManager.scheduleRestart(`Task ${taskId} completed successfully`, [taskId])
     }
+  })
+  engine.on('task:failed', (taskId, error) => broadcast('engine:task:failed', taskId, error))
+  engine.on('task:logs_updated', (taskId, logs) => broadcast('engine:task:logs_updated', taskId, logs))
+  setEngine(engine)
+  if (state.running) {
+    engine.start()
   }
 
   app.on('activate', function () {

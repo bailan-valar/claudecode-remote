@@ -1,22 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useProjectStore } from '../stores/useProjectStore'
 import { apiClient } from '../api'
-import type { Project } from '../../../shared/types'
-
-type Provider = 'anthropic' | 'zhipu' | 'kimi'
-
-const PRESET_URLS: Record<Provider, string> = {
-  anthropic: '',
-  zhipu: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-  kimi: 'https://api.moonshot.cn/v1/chat/completions',
-}
-
-const PRESET_MODELS: Record<Provider, string> = {
-  anthropic: 'claude-sonnet-4-20250514',
-  zhipu: '',
-  kimi: '',
-}
+import type { Project, LlmProvider } from '../../../shared/types'
 
 const props = defineProps<{
   initialProject?: Project
@@ -31,10 +17,7 @@ const projectStore = useProjectStore()
 const name = ref('')
 const path = ref('')
 const description = ref('')
-const llmProvider = ref<Provider>('anthropic')
-const llmBaseUrl = ref('')
-const llmApiKey = ref('')
-const llmModel = ref('')
+const llmProviderId = ref<string>('')
 const allowedTools = ref('Read,Edit,Bash')
 const webhookUrl = ref('')
 const webhookEnabled = ref(false)
@@ -44,17 +27,45 @@ const siteUrl = ref('')
 const webhookTesting = ref(false)
 const webhookTestMessage = ref<{ ok: boolean; text: string } | null>(null)
 
+// LLM Providers
+const llmProviders = ref<LlmProvider[]>([])
+const isLoadingProviders = ref(false)
+
 const isEdit = computed(() => props.mode === 'edit')
+const isElectron = typeof window !== 'undefined' && !!(window as any).api
+
+// 当前选中的 Provider
+const selectedProvider = computed(() => {
+  return llmProviders.value.find(p => p.id === llmProviderId.value)
+})
+
+async function loadLlmProviders() {
+  isLoadingProviders.value = true
+  try {
+    const result = await apiClient.listLlmProviders()
+    if (result.ok) {
+      llmProviders.value = result.providers || []
+    }
+  } finally {
+    isLoadingProviders.value = false
+  }
+}
 
 watch(() => props.initialProject, (p) => {
   if (p) {
     name.value = p.name
     path.value = p.path
     description.value = p.description ?? ''
-    llmProvider.value = p.llmConfig?.provider ?? 'anthropic'
-    llmBaseUrl.value = p.llmConfig?.baseUrl ?? ''
-    llmApiKey.value = p.llmConfig?.apiKey ?? ''
-    llmModel.value = p.llmConfig?.model ?? ''
+
+    // 优先使用 llmProviderId，兼容旧的 llmConfig
+    if (p.llmProviderId) {
+      llmProviderId.value = p.llmProviderId
+    } else if (p.llmConfig?.provider) {
+      // 旧数据：尝试匹配对应的 provider
+      const mapped = llmProviders.value.find(lp => lp.type === p.llmConfig?.provider)
+      llmProviderId.value = mapped?.id || ''
+    }
+
     allowedTools.value = p.allowedTools?.join(',') ?? 'Read,Edit,Bash'
     webhookUrl.value = p.webhookUrl ?? ''
     webhookEnabled.value = p.webhookEnabled ?? false
@@ -63,17 +74,6 @@ watch(() => props.initialProject, (p) => {
     siteUrl.value = p.siteUrl ?? ''
   }
 }, { immediate: true })
-
-watch(llmProvider, (provider) => {
-  if (!isEdit.value || !props.initialProject?.llmConfig?.baseUrl) {
-    llmBaseUrl.value = PRESET_URLS[provider]
-  }
-  if (!isEdit.value || !props.initialProject?.llmConfig?.model) {
-    llmModel.value = PRESET_MODELS[provider]
-  }
-})
-
-const isElectron = typeof window !== 'undefined' && !!(window as any).api
 
 async function handleSelectDirectory() {
   const result = await apiClient.selectDirectory()
@@ -104,28 +104,22 @@ async function handleTestWebhook() {
   }
 }
 
-function buildLlmConfig() {
-  return {
-    provider: llmProvider.value,
-    baseUrl: llmBaseUrl.value || undefined,
-    apiKey: llmApiKey.value || undefined,
-    model: llmModel.value || undefined,
-  }
-}
-
 async function handleSubmit() {
   const tools = allowedTools.value.split(',').map(s => s.trim()).filter(Boolean)
   const mentioned = webhookMentionedList.value.split(',').map(s => s.trim()).filter(Boolean)
+
   if (isEdit.value) {
     const changes: Partial<Project> = {}
     if (name.value !== props.initialProject!.name) changes.name = name.value
     if (path.value !== props.initialProject!.path) changes.path = path.value
     if (description.value !== (props.initialProject!.description ?? '')) changes.description = description.value || undefined
-    const newLlm = buildLlmConfig()
-    const oldLlm = props.initialProject!.llmConfig
-    if (JSON.stringify(newLlm) !== JSON.stringify(oldLlm)) {
-      changes.llmConfig = newLlm
+
+    // 处理 LLM Provider 变更
+    const oldProviderId = props.initialProject!.llmProviderId
+    if (llmProviderId.value !== oldProviderId) {
+      changes.llmProviderId = llmProviderId.value || undefined
     }
+
     const oldTools = props.initialProject!.allowedTools?.join(',') ?? 'Read,Edit,Bash'
     if (allowedTools.value !== oldTools) changes.allowedTools = tools
     if (webhookUrl.value !== (props.initialProject!.webhookUrl ?? '')) changes.webhookUrl = webhookUrl.value || undefined
@@ -137,11 +131,12 @@ async function handleSubmit() {
     emit('submit', changes)
     return
   }
+
   const result = await projectStore.create({
     name: name.value,
     path: path.value,
     description: description.value || undefined,
-    llmConfig: buildLlmConfig(),
+    llmProviderId: llmProviderId.value || undefined,
     allowedTools: tools,
     webhookUrl: webhookUrl.value || undefined,
     webhookEnabled: webhookEnabled.value,
@@ -153,10 +148,7 @@ async function handleSubmit() {
     name.value = ''
     path.value = ''
     description.value = ''
-    llmProvider.value = 'anthropic'
-    llmBaseUrl.value = ''
-    llmApiKey.value = ''
-    llmModel.value = ''
+    llmProviderId.value = ''
     allowedTools.value = 'Read,Edit,Bash'
     webhookUrl.value = ''
     webhookEnabled.value = false
@@ -166,6 +158,10 @@ async function handleSubmit() {
     emit('submit')
   }
 }
+
+onMounted(() => {
+  loadLlmProviders()
+})
 </script>
 
 <template>
@@ -179,21 +175,36 @@ async function handleSubmit() {
 
     <fieldset class="llm-config glass">
       <legend>LLM 配置</legend>
-      <label>Provider</label>
-      <select v-model="llmProvider" class="glass-input">
-        <option value="anthropic">Anthropic 官方</option>
-        <option value="zhipu">智谱 GLM</option>
-        <option value="kimi">Kimi K2</option>
+      <div class="config-note">
+        <p>选择该项目使用的大模型服务。留空则使用全局默认 Provider。</p>
+      </div>
+
+      <label>大模型服务 (LLM)</label>
+      <select v-model="llmProviderId" class="glass-input" :disabled="isLoadingProviders">
+        <option value="">使用全局默认</option>
+        <option v-for="p in llmProviders" :key="p.id" :value="p.id">
+          {{ p.name }}{{ p.isDefault ? ' (全局默认)' : '' }}
+        </option>
       </select>
 
-      <label>Base URL</label>
-      <input v-model="llmBaseUrl" class="glass-input" placeholder="可选，留空使用默认" />
-
-      <label>API Key</label>
-      <input v-model="llmApiKey" class="glass-input" type="password" placeholder="可选" />
-
-      <label>模型名称</label>
-      <input v-model="llmModel" class="glass-input" placeholder="可选" />
+      <div v-if="selectedProvider" class="provider-info">
+        <div class="info-item">
+          <span class="info-label">类型</span>
+          <span class="info-value">{{ selectedProvider.type }}</span>
+        </div>
+        <div v-if="selectedProvider.baseUrl" class="info-item">
+          <span class="info-label">Base URL</span>
+          <span class="info-value">{{ selectedProvider.baseUrl }}</span>
+        </div>
+        <div v-if="selectedProvider.model" class="info-item">
+          <span class="info-label">模型</span>
+          <span class="info-value">{{ selectedProvider.model }}</span>
+        </div>
+        <div v-if="selectedProvider.apiKey" class="info-item">
+          <span class="info-label">API Key</span>
+          <span class="info-value masked">{{ selectedProvider.apiKey.slice(0, 4) }}...{{ selectedProvider.apiKey.slice(-4) }}</span>
+        </div>
+      </div>
 
       <label>允许的工具</label>
       <input v-model="allowedTools" class="glass-input" placeholder="Read,Edit,Bash" />
@@ -293,6 +304,13 @@ async function handleSubmit() {
   color: var(--color-text);
 }
 
+.config-note p {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  margin-bottom: var(--space-md);
+  line-height: 1.4;
+}
+
 .llm-config label {
   display: block;
   font-size: 0.8125rem;
@@ -304,6 +322,41 @@ async function handleSubmit() {
 
 .llm-config .glass-input {
   margin-bottom: var(--space-xs);
+}
+
+.llm-config .glass-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.provider-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(var(--color-primary-rgb, 99, 102, 241), 0.05);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-xs);
+}
+
+.info-item {
+  display: flex;
+  gap: var(--space-xs);
+  font-size: 0.8125rem;
+}
+
+.info-label {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.info-value {
+  color: var(--color-text);
+  font-family: monospace;
+}
+
+.info-value.masked {
+  letter-spacing: 1px;
 }
 
 .webhook-config {

@@ -11,7 +11,24 @@ async function httpInvoke(method: string, path: string, body?: any): Promise<any
     options.body = JSON.stringify(body)
   }
   const res = await fetch(path, options)
-  return res.json()
+  const text = await res.text()
+
+  // 检查 HTTP 状态码
+  if (!res.ok) {
+    // 尝试从错误响应中解析错误信息
+    try {
+      const errorData = JSON.parse(text)
+      throw new Error(errorData.error || `HTTP ${res.status}: ${res.statusText}`)
+    } catch {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+    }
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch (err) {
+    throw new Error(`响应解析失败: ${text.slice(0, 100)}`)
+  }
 }
 
 let sseSource: EventSource | null = null
@@ -23,8 +40,8 @@ function ensureSse(): EventSource {
     sseSource.onmessage = (e) => {
       // ignore plain messages
     }
-    sseSource.onerror = (err) => {
-      console.warn('[sse] error:', err)
+    sseSource.onerror = () => {
+      // SSE errors are handled by the browser reconnect mechanism
     }
     sseSource.addEventListener('sync:status', (e) => {
       const data = JSON.parse((e as MessageEvent).data)
@@ -105,11 +122,6 @@ const httpApi: Api = {
   resetConfig: () => httpInvoke('POST', '/api/config/reset'),
   testCouchdbConnection: (config) => httpInvoke('POST', '/api/config/test-couchdb', config),
 
-  login: (username, password) => httpInvoke('POST', '/api/auth/login', { username, password }),
-  register: (username, password) => httpInvoke('POST', '/api/auth/register', { username, password }),
-  logout: () => httpInvoke('POST', '/api/auth/logout'),
-  getSession: () => httpInvoke('GET', '/api/auth/session'),
-
   listProjects: () => httpInvoke('GET', '/api/projects'),
   createProject: (doc) => httpInvoke('POST', '/api/projects', doc),
   updateProject: (id, doc) => httpInvoke('PATCH', `/api/projects/${id}`, doc),
@@ -166,6 +178,18 @@ const httpApi: Api = {
 
   exportData: () => httpInvoke('GET', '/api/data/export'),
   importData: (data, options?) => httpInvoke('POST', '/api/data/import', { data, options }),
+
+  getInstanceInfo: () => httpInvoke('GET', '/api/instance/info'),
+
+  // === LLM Providers ===
+  listLlmProviders: () => httpInvoke('GET', '/api/llm/providers'),
+  getLlmProvider: (id: string) => httpInvoke('GET', `/api/llm/providers/${id}`),
+  getDefaultLlmProvider: () => httpInvoke('GET', '/api/llm/providers/default'),
+  addLlmProvider: (provider: any) => httpInvoke('POST', '/api/llm/providers', provider),
+  updateLlmProvider: (id: string, updates: any) =>
+    httpInvoke('PATCH', `/api/llm/providers/${id}`, updates),
+  deleteLlmProvider: (id: string) => httpInvoke('DELETE', `/api/llm/providers/${id}`),
+  setDefaultLlmProvider: (id: string) => httpInvoke('POST', `/api/llm/providers/${id}/setDefault`),
 }
 
 export const apiClient: Api = isElectron ? (window as any).api : httpApi

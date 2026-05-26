@@ -1,21 +1,5 @@
-import type { TaskRunner, RunResult } from './runner'
+import type { TaskRunner } from './runner'
 import { claudeRunner } from './claudeRunner'
-import { mockRunner } from './mockRunner'
-
-class PlaceholderRunner implements TaskRunner {
-  readonly name: string
-
-  constructor(name: string) {
-    this.name = name
-  }
-
-  async runTask(): Promise<RunResult> {
-    return {
-      success: false,
-      error: `${this.name} 执行引擎尚未实现，请切换为 anthropic (Claude Code)`,
-    }
-  }
-}
 
 const registry = new Map<string, TaskRunner>()
 
@@ -24,10 +8,8 @@ export function registerRunner(provider: string, runner: TaskRunner): void {
 }
 
 export function getRunner(provider?: string): TaskRunner {
-  if (!provider || !registry.has(provider)) {
-    return registry.get('anthropic') ?? new PlaceholderRunner('默认')
-  }
-  return registry.get(provider)!
+  // 当前只实现了 Claude Code 执行引擎，强制使用 anthropic
+  return registry.get('anthropic')!
 }
 
 export function listRunners(): Array<{ provider: string; name: string }> {
@@ -37,8 +19,5 @@ export function listRunners(): Array<{ provider: string; name: string }> {
   }))
 }
 
-// 注册内置执行引擎
+// 注册内置执行引擎（当前仅支持 Claude Code）
 registerRunner('anthropic', claudeRunner)
-registerRunner('mock', mockRunner)
-registerRunner('zhipu', new PlaceholderRunner('智谱 GLM'))
-registerRunner('kimi', new PlaceholderRunner('Kimi K2'))

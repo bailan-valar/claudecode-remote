@@ -1,15 +1,50 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { Project, Task } from '../../shared/types'
 import type { TaskRunner, LogEntry, RunResult, RunOptions } from './runner'
+import { getLlmProvider, getDefaultLlmProvider } from '../configStore'
+import type { LlmProvider } from '../../shared/types'
 
+/**
+ * 从项目获取 LLM Provider 配置
+ * 优先级：项目关联的 provider > 全局默认 provider
+ */
+function getLlmProviderForProject(project: Project): LlmProvider | null {
+  // 如果项目有关联的 provider ID，使用它
+  if (project.llmProviderId) {
+    return getLlmProvider(project.llmProviderId)
+  }
+
+  // 兼容旧数据：如果项目有 llmConfig，返回 null 让调用方使用旧的逻辑
+  if (project.llmConfig) {
+    return null
+  }
+
+  // 使用全局默认 provider
+  return getDefaultLlmProvider()
+}
+
+/**
+ * 从 LlmProvider 或 Project.llmConfig 构建环境变量
+ */
 function buildEnv(project: Project): NodeJS.ProcessEnv {
   const env = { ...process.env }
-  if (project.llmConfig) {
+
+  // 尝试获取 provider
+  const provider = getLlmProviderForProject(project)
+
+  if (provider) {
+    // 使用 provider 配置
+    if (provider.baseUrl) env.ANTHROPIC_BASE_URL = provider.baseUrl
+    if (provider.apiKey) env.ANTHROPIC_API_KEY = provider.apiKey
+    if (provider.model) env.ANTHROPIC_MODEL = provider.model
+  } else if (project.llmConfig) {
+    // 兼容旧的 llmConfig
     const { baseUrl, apiKey, model } = project.llmConfig
     if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl
     if (apiKey) env.ANTHROPIC_API_KEY = apiKey
     if (model) env.ANTHROPIC_MODEL = model
   }
+
   return env
 }
 

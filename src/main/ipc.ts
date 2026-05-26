@@ -5,6 +5,7 @@ import { mainEvents } from './events'
 import type { LogEntry } from './engine/runner'
 import * as configStore from './configStore'
 import type { AppConfig } from './configStore'
+import type { LlmProvider } from '../shared/types'
 
 export function registerIpcHandlers(win: BrowserWindow) {
   // --- Broadcast to renderer window ---
@@ -63,27 +64,6 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.handle('sync:refresh', async () => {
     syncManager.restart()
     return { ok: true }
-  })
-
-  // --- Auth handlers ---
-  ipcMain.removeHandler('auth:register')
-  ipcMain.handle('auth:register', async (_, username: string, password: string) => {
-    return api.registerAction(username, password)
-  })
-
-  ipcMain.removeHandler('auth:login')
-  ipcMain.handle('auth:login', async (_, username: string, password: string) => {
-    return api.loginAction(username, password)
-  })
-
-  ipcMain.removeHandler('auth:logout')
-  ipcMain.handle('auth:logout', async () => {
-    return api.logoutAction()
-  })
-
-  ipcMain.removeHandler('auth:session')
-  ipcMain.handle('auth:session', async () => {
-    return api.getSessionAction()
   })
 
   // --- Project CRUD handlers ---
@@ -204,6 +184,98 @@ export function registerIpcHandlers(win: BrowserWindow) {
   ipcMain.removeHandler('data:import')
   ipcMain.handle('data:import', async (_, data: any, options?: any) => {
     return api.importDataAction(data, options)
+  })
+
+  // --- Instance Info handler ---
+  ipcMain.removeHandler('instance:info')
+  ipcMain.handle('instance:info', async () => {
+    return api.getInstanceInfoAction()
+  })
+
+  // --- LLM Providers handlers ---
+  ipcMain.removeHandler('llm:providers:list')
+  ipcMain.handle('llm:providers:list', async () => {
+    try {
+      const providers = configStore.loadLlmProviders()
+      return { ok: true, providers }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '加载 Provider 列表失败' }
+    }
+  })
+
+  ipcMain.removeHandler('llm:providers:get')
+  ipcMain.handle('llm:providers:get', async (_, id: string) => {
+    try {
+      const provider = configStore.getLlmProvider(id)
+      if (!provider) {
+        return { ok: false, error: 'Provider 不存在' }
+      }
+      return { ok: true, provider }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '获取 Provider 失败' }
+    }
+  })
+
+  ipcMain.removeHandler('llm:providers:getDefault')
+  ipcMain.handle('llm:providers:getDefault', async () => {
+    try {
+      const provider = configStore.getDefaultLlmProvider()
+      if (!provider) {
+        return { ok: false, error: '没有可用的 Provider' }
+      }
+      return { ok: true, provider }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '获取默认 Provider 失败' }
+    }
+  })
+
+  ipcMain.removeHandler('llm:providers:add')
+  ipcMain.handle('llm:providers:add', async (_, provider: Omit<LlmProvider, 'id' | 'createdAt'>) => {
+    try {
+      const newProvider = configStore.addLlmProvider(provider)
+      return { ok: true, provider: newProvider }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '添加 Provider 失败' }
+    }
+  })
+
+  ipcMain.removeHandler('llm:providers:update')
+  ipcMain.handle('llm:providers:update', async (_, id: string, updates: Partial<Omit<LlmProvider, 'id' | 'createdAt'>>) => {
+    try {
+      const updated = configStore.updateLlmProvider(id, updates)
+      if (!updated) {
+        return { ok: false, error: 'Provider 不存在' }
+      }
+      return { ok: true, provider: updated }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '更新 Provider 失败' }
+    }
+  })
+
+  ipcMain.removeHandler('llm:providers:delete')
+  ipcMain.handle('llm:providers:delete', async (_, id: string) => {
+    try {
+      const success = configStore.deleteLlmProvider(id)
+      if (!success) {
+        return { ok: false, error: 'Provider 不存在' }
+      }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '删除 Provider 失败' }
+    }
+  })
+
+  ipcMain.removeHandler('llm:providers:setDefault')
+  ipcMain.handle('llm:providers:setDefault', async (_, id: string) => {
+    try {
+      const updated = configStore.updateLlmProvider(id, { isDefault: true })
+      if (!updated) {
+        return { ok: false, error: 'Provider 不存在' }
+      }
+      return { ok: true, provider: updated }
+    } catch (err: any) {
+      return { ok: false, error: err.message || '设置默认 Provider 失败' }
+    }
   })
 
   // --- System restart handlers ---

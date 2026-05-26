@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, defineOptions } from 'vue'
+import { onMounted, ref, defineOptions } from 'vue'
 // import { useSyncStore } from '../stores/useSyncStore' // 暂时隐藏同步功能
 import { useProjectStore } from '../stores/useProjectStore'
 import { useTaskStore } from '../stores/useTaskStore'
 import { useEngineStore } from '../stores/useEngineStore'
+import { apiClient } from '../api'
+import type { LlmProvider } from '../../../preload/index'
 // import { storeToRefs } from 'pinia' // 暂时不需要
 
 defineOptions({
@@ -16,10 +18,42 @@ const projectStore = useProjectStore()
 const taskStore = useTaskStore()
 const engineStore = useEngineStore()
 
+// LLM Providers
+const llmProviders = ref<LlmProvider[]>([])
+const currentLlmProvider = ref<LlmProvider | null>(null)
+const isLoadingLlmProviders = ref(false)
+
+async function loadLlmProviders() {
+  isLoadingLlmProviders.value = true
+  try {
+    const result = await apiClient.listLlmProviders()
+    if (result.ok) {
+      llmProviders.value = result.providers || []
+      // 加载当前默认 provider
+      const defaultResult = await apiClient.getDefaultLlmProvider()
+      if (defaultResult.ok) {
+        currentLlmProvider.value = defaultResult.provider
+      }
+    }
+  } finally {
+    isLoadingLlmProviders.value = false
+  }
+}
+
+async function setLlmProvider(id: string) {
+  const result = await apiClient.setDefaultLlmProvider(id)
+  if (result.ok) {
+    llmProviders.value.forEach(p => p.isDefault = (p.id === id))
+    currentLlmProvider.value = result.provider
+  }
+  return result
+}
+
 onMounted(() => {
   projectStore.fetch()
   taskStore.fetch()
   engineStore.fetchStatus()
+  loadLlmProviders()
   // engineStore.listen() 已在 App.vue 中全局调用，这里不需要重复调用
 })
 
@@ -119,6 +153,24 @@ onMounted(() => {
             :value="p.provider"
           >
             {{ p.name }}
+          </option>
+        </select>
+      </div>
+      <div class="engine-llm-provider">
+        <label>大模型 (LLM)</label>
+        <select
+          class="glass-input"
+          :disabled="isLoadingLlmProviders || llmProviders.length === 0"
+          :value="currentLlmProvider?.id"
+          @change="setLlmProvider(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-if="!currentLlmProvider" value="">请选择</option>
+          <option
+            v-for="p in llmProviders"
+            :key="p.id"
+            :value="p.id"
+          >
+            {{ p.name }}{{ p.isDefault ? ' (默认)' : '' }}
           </option>
         </select>
       </div>
@@ -274,6 +326,30 @@ onMounted(() => {
 .engine-provider select {
   flex: 1;
   min-width: 0;
+}
+
+.engine-llm-provider {
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.engine-llm-provider label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  min-width: 80px;
+  font-weight: 500;
+}
+
+.engine-llm-provider select {
+  flex: 1;
+  min-width: 0;
+}
+
+.engine-llm-provider select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .engine-concurrency {

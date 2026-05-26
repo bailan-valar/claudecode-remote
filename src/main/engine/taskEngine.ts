@@ -98,11 +98,13 @@ export class TaskEngine extends EventEmitter {
   }
 
   getProvider(): string {
-    return this._provider ?? 'anthropic'
+    // 当前仅支持 Claude Code 执行引擎
+    return 'anthropic'
   }
 
-  setProvider(name: string): void {
-    this._provider = name
+  setProvider(_name: string): void {
+    // 当前仅支持 Claude Code，忽略其他 provider 设置
+    this._provider = 'anthropic'
     this.emit('status', this.getStatus())
   }
 
@@ -421,8 +423,8 @@ export class TaskEngine extends EventEmitter {
     }
 
     try {
-      const runner = getRunner(this._provider ?? project.llmConfig?.provider)
-      console.log(`[engine] 使用执行引擎: ${runner.name} (provider=${this._provider ?? project.llmConfig?.provider ?? 'anthropic'})`)
+      const runner = getRunner(this._provider ?? 'anthropic')
+      console.log(`[engine] 使用执行引擎: ${runner.name} (provider=${this._provider ?? 'anthropic'})`)
       const result = await runner.runTask(taskWithSession, project, {
         onLog: (entry) => {
           logs.push(entry)

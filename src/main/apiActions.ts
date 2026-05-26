@@ -1,4 +1,9 @@
-import { syncManager, authManager, getEngine, setEngine } from './index'
+import PouchDB from 'pouchdb'
+import { randomUUID } from 'crypto'
+import { join } from 'path'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { app } from 'electron'
+import { syncManager, getEngine, setEngine, getDefaultLocalDb } from './index'
 import { createProjectRepository } from './repositories/projectRepository'
 import { createTaskRepository } from './repositories/taskRepository'
 import { createChatRepository, createChatSessionRepository } from './repositories/chatRepository'
@@ -10,9 +15,42 @@ import type { TimeEntry } from './utils/taskTimeTracking'
 import { broadcast } from './events'
 import { sendWecomMessage, buildTestMessage } from './engine/wecomNotifier'
 import { runClaudeChat } from './engine/claudeRunner'
-import { saveCredentials, loadCredentials, clearCredentials } from './credentialStore'
 import type { Project, Task, ChatMessage } from '../shared/types'
 import type { LogEntry } from './engine/runner'
+
+const INSTANCE_ID_FILE = join(app.getPath('userData'), 'instance-id.json')
+
+interface InstanceId {
+  id: string
+  createdAt: string
+}
+
+function getInstanceId(): string {
+  if (existsSync(INSTANCE_ID_FILE)) {
+    try {
+      const data = JSON.parse(readFileSync(INSTANCE_ID_FILE, 'utf-8')) as InstanceId
+      return data.id
+    } catch {
+      // ignore
+    }
+  }
+  // 生成新的实例ID
+  const newInstance: InstanceId = {
+    id: randomUUID(),
+    createdAt: new Date().toISOString()
+  }
+  writeFileSync(INSTANCE_ID_FILE, JSON.stringify(newInstance, null, 2))
+  return newInstance.id
+}
+
+function getLocalDbName(): string {
+  const instanceId = getInstanceId()
+  return `cc-remote-${instanceId.slice(0, 8)}`
+}
+
+function getLocalDb(): PouchDB.Database {
+  return getDefaultLocalDb()!
+}
 
 function setupEngine(db: PouchDB.Database, options: { concurrency?: number; provider?: string }): TaskEngine {
   const oldEngine = getEngine()
@@ -28,84 +66,12 @@ function setupEngine(db: PouchDB.Database, options: { concurrency?: number; prov
   return engine
 }
 
-// === Auth ===
-
-export async function registerAction(username: string, password: string) {
-  console.log('[api] auth:register', username)
-  try {
-    await authManager.signUp(username, password)
-    console.log('[api] auth:register ok')
-    return { ok: true }
-  } catch (err: any) {
-    console.error('[api] auth:register failed:', err.message)
-    return { ok: false, error: err.message || '注册失败' }
-  }
-}
-
-export async function loginAction(username: string, password: string) {
-  console.log('[api] auth:login', username)
-  try {
-    const user = await authManager.logIn(username, password)
-    await syncManager.switchToUser(username, password)
-    const db = syncManager.getLocalDb()
-    if (db) {
-      const state = loadEngineState()
-      const engine = setupEngine(db, { provider: state.provider })
-      if (state.running) {
-        engine.start()
-      }
-    }
-    saveCredentials(username, password)
-    console.log('[api] auth:login ok')
-    return { ok: true, user }
-  } catch (err: any) {
-    console.error('[api] auth:login failed:', err.message)
-    return { ok: false, error: err.message || '登录失败' }
-  }
-}
-
-export async function logoutAction() {
-  console.log('[api] auth:logout')
-  try {
-    getEngine()?.stop?.()
-    setEngine(null)
-    await authManager.logOut()
-    syncManager.logout()
-    clearCredentials()
-    console.log('[api] auth:logout ok')
-    return { ok: true }
-  } catch (err: any) {
-    console.error('[api] auth:logout failed:', err.message)
-    return { ok: false, error: err.message || '注销失败' }
-  }
-}
-
-export async function getSessionAction() {
-  try {
-    let user = await authManager.getSession()
-    if (!user) {
-      const creds = loadCredentials()
-      if (creds) {
-        console.log('[api] auto-login with stored credentials')
-        const result = await loginAction(creds.username, creds.password)
-        if (result.ok && result.user) {
-          user = result.user
-        }
-      }
-    }
-    return { user }
-  } catch (err: any) {
-    console.error('[api] getSession failed:', err.message)
-    return { user: null }
-  }
-}
-
 // === Projects ===
 
 export async function listProjectsAction() {
   console.log('[api] project:list')
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createProjectRepository(db)
   const projects = await repo.findAll()
   console.log('[api] project:list ok, count=', projects.length)
@@ -114,8 +80,8 @@ export async function listProjectsAction() {
 
 export async function createProjectAction(doc: Omit<Project, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt'>) {
   console.log('[api] project:create', (doc as any).name)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createProjectRepository(db)
   const now = new Date().toISOString()
   const project = await repo.create({
@@ -131,8 +97,8 @@ export async function createProjectAction(doc: Omit<Project, '_id' | '_rev' | 't
 
 export async function updateProjectAction(id: string, changes: Partial<Project>) {
   console.log('[api] project:update', id, changes)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createProjectRepository(db)
   const project = await repo.update(id, { ...changes, updatedAt: new Date().toISOString() })
   console.log('[api] project:update ok', project._rev)
@@ -142,8 +108,8 @@ export async function updateProjectAction(id: string, changes: Partial<Project>)
 
 export async function deleteProjectAction(id: string) {
   console.log('[api] project:delete', id)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createProjectRepository(db)
   await repo.delete(id)
   console.log('[api] project:delete ok')
@@ -155,8 +121,8 @@ export async function deleteProjectAction(id: string) {
 
 export async function listTasksAction(projectId?: string) {
   console.log('[api] task:list', projectId || '(all)')
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createTaskRepository(db)
   let tasks = await repo.findAll()
   if (projectId) {
@@ -170,8 +136,8 @@ export async function listTasksAction(projectId?: string) {
 
 export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' | 'createdAt' | 'updatedAt' | 'logs' | 'createdVia' | 'priority' | 'timeEntries' | 'totalDuration' | 'kind'> & { status?: Task['status']; priority?: Task['priority']; kind?: Task['kind'] }) {
   console.log('[api] task:create', (doc as any).title)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createTaskRepository(db)
   const now = new Date().toISOString()
   const initialStatus = doc.status || (doc.isPlan ? 'plan_required' : 'pending')
@@ -202,8 +168,8 @@ export async function createTaskAction(doc: Omit<Task, '_id' | '_rev' | 'type' |
 
 export async function updateTaskAction(id: string, changes: Partial<Task>) {
   console.log('[api] task:update', id, changes)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createTaskRepository(db)
 
   let merged = { ...changes }
@@ -223,8 +189,8 @@ export async function updateTaskAction(id: string, changes: Partial<Task>) {
 
 export async function deleteTaskAction(id: string) {
   console.log('[api] task:delete', id)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createTaskRepository(db)
   await repo.delete(id)
   console.log('[api] task:delete ok')
@@ -257,8 +223,8 @@ export async function startEngineAction() {
     saveEngineState({ running: true, concurrency: engine.concurrency, provider: engine.getProvider() })
     return { ok: true }
   }
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const state = loadEngineState()
   const newEngine = setupEngine(db, { concurrency: state.concurrency ?? 1, provider: state.provider })
   newEngine.start()
@@ -381,8 +347,8 @@ const chatControllers = new Map<string, AbortController>()
 
 export async function chatWithClaudeAction(projectId: string, message: string, sessionId?: string) {
   console.log('[api] claude:chat', projectId, message.slice(0, 60))
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
   const repo = createProjectRepository(db)
   const project = await repo.findById(projectId)
   if (!project) return { ok: false, error: '项目不存在' }
@@ -422,8 +388,8 @@ export function abortClaudeChatAction(chatId?: string) {
 
 export async function getChatHistoryAction(projectId: string) {
   console.log('[api] chat:history', projectId)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
 
   const chatRepo = createChatRepository(db)
   const messages = await chatRepo.findByProjectId(projectId)
@@ -438,8 +404,8 @@ export async function getChatHistoryAction(projectId: string) {
 
 export async function saveChatMessageAction(message: Omit<ChatMessage, '_id' | '_rev'>) {
   console.log('[api] chat:save', message.projectId, message.role)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
 
   const chatRepo = createChatRepository(db)
   const now = new Date().toISOString()
@@ -455,8 +421,8 @@ export async function saveChatMessageAction(message: Omit<ChatMessage, '_id' | '
 
 export async function clearChatHistoryAction(projectId: string) {
   console.log('[api] chat:clear', projectId)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
 
   const chatRepo = createChatRepository(db)
   await chatRepo.deleteByProjectId(projectId)
@@ -477,8 +443,9 @@ export interface DataExport {
 
 export async function exportDataAction() {
   console.log('[api] data:export')
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
 
   try {
     const projectRepo = createProjectRepository(db)
@@ -498,7 +465,7 @@ export async function exportDataAction() {
     }
 
     console.log('[api] data:export ok', { projects: projects.length, tasks: tasks.length })
-    return { ok: true, data }
+    return { ok: true, data, instanceId: getInstanceId() }
   } catch (err: any) {
     console.error('[api] data:export error:', err.message)
     return { ok: false, error: err.message || '导出失败' }
@@ -525,9 +492,8 @@ export async function importDataAction(
   data: DataExport,
   options: ImportOptions = {}
 ) {
-  console.log('[api] data:import', options)
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
 
   const result: ImportResult = {
     projectsCreated: 0,
@@ -556,11 +522,16 @@ export async function importDataAction(
           if (skipConflicts) {
             result.projectsSkipped++
           } else {
-            await projectRepo.update(project._id, project)
+            // 合并更新：保留现有 _rev，用新数据覆盖其他字段
+            const { _rev, ...projectData } = project
+            const updated = { ...existing, ...projectData, _id: project._id, _rev: existing._rev }
+            await db.put(updated)
             result.projectsUpdated++
           }
         } else {
-          await projectRepo.create(project)
+          // 新文档：移除 _rev，保留原 _id
+          const { _rev, ...projectData } = project
+          await db.put({ ...projectData, _id: project._id })
           result.projectsCreated++
         }
       } catch (err: any) {
@@ -576,11 +547,14 @@ export async function importDataAction(
           if (skipConflicts) {
             result.tasksSkipped++
           } else {
-            await taskRepo.update(task._id, task)
+            const { _rev, ...taskData } = task
+            const updated = { ...existing, ...taskData, _id: task._id, _rev: existing._rev }
+            await db.put(updated)
             result.tasksUpdated++
           }
         } else {
-          await taskRepo.create(task)
+          const { _rev, ...taskData } = task
+          await db.put({ ...taskData, _id: task._id })
           result.tasksCreated++
         }
       } catch (err: any) {
@@ -592,7 +566,8 @@ export async function importDataAction(
     if (data.chatMessages) {
       for (const msg of data.chatMessages) {
         try {
-          await chatRepo.create(msg)
+          const { _rev, ...msgData } = msg
+          await db.put({ ...msgData, _id: msg._id })
           result.chatMessagesImported++
         } catch (err: any) {
           result.errors.push(`聊天消息导入失败: ${err.message}`)
@@ -600,10 +575,8 @@ export async function importDataAction(
       }
     }
 
-    console.log('[api] data:import ok', result)
     return { ok: true, result }
   } catch (err: any) {
-    console.error('[api] data:import error:', err.message)
     return { ok: false, error: err.message || '导入失败', result }
   }
 }
@@ -616,8 +589,8 @@ import { promisify } from 'util'
 export async function executeTerminalCommandAction(projectId: string, command: string, workingDir?: string) {
   console.log('[api] terminal:execute', projectId, command.slice(0, 60))
 
-  const db = syncManager.getLocalDb()
-  if (!db) return { ok: false, error: '未登录' }
+  const db = getLocalDb()
+  if (!db) return { ok: false, error: '数据库未初始化' }
 
   const repo = createProjectRepository(db)
   const project = await repo.findById(projectId)
@@ -682,4 +655,17 @@ export async function executeTerminalCommandAction(projectId: string, command: s
       })
     })
   })
+}
+
+// === Instance Info ===
+
+export async function getInstanceInfoAction() {
+  const instanceId = getInstanceId()
+  const localDbName = getLocalDbName()
+
+  return {
+    ok: true,
+    instanceId,
+    localDbName,
+  }
 }

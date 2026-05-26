@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Project, Task, ChatMessage } from '../shared/types'
+import type { Project, Task, ChatMessage, LlmProvider } from '../shared/types'
 import type { LogEntry } from '../main/engine/runner'
 import type { AppConfig } from '../main/configStore'
 
@@ -25,14 +25,6 @@ const api = {
   resetConfig: () => ipcRenderer.invoke('config:reset'),
   testCouchdbConnection: (config: { url: string; adminUser?: string; adminPassword?: string }) =>
     ipcRenderer.invoke('config:test-couchdb', config),
-
-  // === Auth ===
-  login: (username: string, password: string) =>
-    ipcRenderer.invoke('auth:login', username, password),
-  register: (username: string, password: string) =>
-    ipcRenderer.invoke('auth:register', username, password),
-  logout: () => ipcRenderer.invoke('auth:logout'),
-  getSession: () => ipcRenderer.invoke('auth:session'),
 
   // === Projects ===
   listProjects: () => ipcRenderer.invoke('project:list'),
@@ -146,8 +138,22 @@ const api = {
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (data: any, options?: { mergeMode?: boolean; skipConflicts?: boolean }) =>
     ipcRenderer.invoke('data:import', data, options),
+
+  // === Instance Info ===
+  getInstanceInfo: () => ipcRenderer.invoke('instance:info'),
+
+  // === LLM Providers ===
+  listLlmProviders: () => ipcRenderer.invoke('llm:providers:list'),
+  getLlmProvider: (id: string) => ipcRenderer.invoke('llm:providers:get', id),
+  getDefaultLlmProvider: () => ipcRenderer.invoke('llm:providers:getDefault'),
+  addLlmProvider: (provider: Omit<LlmProvider, 'id' | 'createdAt'>) =>
+    ipcRenderer.invoke('llm:providers:add', provider),
+  updateLlmProvider: (id: string, updates: Partial<Omit<LlmProvider, 'id' | 'createdAt'>>) =>
+    ipcRenderer.invoke('llm:providers:update', id, updates),
+  deleteLlmProvider: (id: string) => ipcRenderer.invoke('llm:providers:delete', id),
+  setDefaultLlmProvider: (id: string) => ipcRenderer.invoke('llm:providers:setDefault', id),
 }
 
 contextBridge.exposeInMainWorld('api', api)
 export type Api = typeof api
-export type { AppConfig }
+export type { AppConfig, LlmProvider }

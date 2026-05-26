@@ -7,8 +7,11 @@ import ProjectForm from '../components/ProjectForm.vue'
 import TaskEditDialog from '../components/TaskEditDialog.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import TaskListItem from '../components/TaskListItem.vue'
+import TaskCreatePanel from '../components/TaskCreatePanel.vue'
+import KanbanBoard from '../components/KanbanBoard.vue'
+import TaskTreeList from '../components/TaskTreeList.vue'
 import { apiClient } from '../api/index'
-import type { Project, Task } from '../../../shared/types'
+import type { Project, Task, LlmProvider } from '../../../shared/types'
 import type { LogEntry } from '../../../main/engine/runner'
 import { TASK_STATUS, type TaskStatus } from '../../../shared/constants'
 import { STATUS_LABEL, STATUS_COLOR } from '../utils/taskTransitions'
@@ -31,7 +34,32 @@ const showTaskDialog = ref(false)
 const editingTask = ref<Task | undefined>(undefined)
 const activeTab = ref<'info' | 'tasks' | 'chat' | 'terminal'>('info')
 const tick = ref(0)
+const llmProviders = ref<LlmProvider[]>([])
+const taskViewMode = ref<'list' | 'kanban'>('list')
+const subtaskParentId = ref<string | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
+
+// 获取项目的 LLM Provider
+const projectLlmProvider = computed(() => {
+  if (!project.value) return undefined
+  if (project.value.llmProviderId) {
+    return llmProviders.value.find(p => p.id === project.value!.llmProviderId)
+  }
+  // 回退到全局默认
+  return llmProviders.value.find(p => p.isDefault)
+})
+
+// 加载 LLM Providers
+async function loadLlmProviders() {
+  try {
+    const result = await apiClient.listLlmProviders()
+    if (result.ok && result.providers) {
+      llmProviders.value = result.providers
+    }
+  } catch (err) {
+    console.warn('加载 LLM Providers 失败:', err)
+  }
+}
 
 function startTick() {
   timerId = setInterval(() => {
@@ -51,6 +79,7 @@ onMounted(() => {
   if (!project.value) projectStore.fetch()
   taskStore.fetch(projectId)
   startTick()
+  loadLlmProviders()
 })
 
 onUnmounted(() => {
@@ -88,6 +117,7 @@ async function handleDelete() {
 
 async function handleTaskCreated() {
   showCreateTask.value = false
+  subtaskParentId.value = null
   await taskStore.fetch(projectId)
 }
 
@@ -105,6 +135,31 @@ async function handleTaskDialogSubmit(task?: Task, changes?: Partial<Task>) {
     await taskStore.fetch(projectId)
   }
 }
+
+function setTaskViewMode(mode: 'list' | 'kanban') {
+  taskViewMode.value = mode
+}
+
+function handleAddSubtask(taskId: string) {
+  const task = taskStore.tasks.find((t) => t._id === taskId)
+  if (task) {
+    subtaskParentId.value = taskId
+    showCreateTask.value = true
+  }
+}
+
+function handleMoveTask(taskId: string, status: TaskStatus) {
+  taskStore.updateStatus(taskId, status)
+}
+
+// 项目名称映射（用于任务组件）
+const projectNameMap = computed(() => {
+  const map = new Map<string, string>()
+  if (project.value) {
+    map.set(project.value._id, project.value.name)
+  }
+  return map
+})
 
 function openCreateTaskDialog() {
   editingTask.value = undefined
@@ -133,74 +188,20 @@ function handleTaskNavigate(taskId: string) {
   router.push({ name: 'task-detail', params: { id: taskId } })
 }
 
-function handleTaskTransition(status: TaskStatus) {
-  // 这里可以添加状态转换逻辑
-  console.log('Task transition:', status)
+function handleTaskTransition(taskId: string, status: TaskStatus) {
+  taskStore.updateStatus(taskId, status)
 }
 
 function handleTaskEdit(taskId: string) {
-  const task = sortedTasks.value.find(t => t._id === taskId)
+  const task = taskStore.tasks.find(t => t._id === taskId)
   if (task) {
     openEditTaskDialog(task)
   }
 }
 
-// 状态分组顺序（按工作流排列）
-const STATUS_ORDER: TaskStatus[] = [
-  TASK_STATUS.PLANNED,
-  TASK_STATUS.PLAN_REQUIRED,
-  TASK_STATUS.PLANNING,
-  TASK_STATUS.PLAN_REVIEWING,
-  TASK_STATUS.PENDING,
-  TASK_STATUS.DEVELOPING,
-  TASK_STATUS.REVIEWING,
-  TASK_STATUS.COMPLETED,
-  TASK_STATUS.CLOSED,
-  TASK_STATUS.STOPPED,
-  TASK_STATUS.FAILED,
-]
-
-// 手风琴收起状态
-const collapsedGroups = ref<Set<TaskStatus>>(new Set())
-
-function toggleGroup(status: TaskStatus) {
-  const next = new Set(collapsedGroups.value)
-  if (next.has(status)) {
-    next.delete(status)
-  } else {
-    next.add(status)
-  }
-  collapsedGroups.value = next
-}
-
-function expandAll() {
-  collapsedGroups.value = new Set()
-}
-
-function collapseAll() {
-  collapsedGroups.value = new Set(STATUS_ORDER)
-}
-
-// 按状态分组并排序
-const groupedTasks = computed(() => {
-  const list = taskStore.filteredTasks
-  const map = {} as Record<TaskStatus, Task[]>
-  STATUS_ORDER.forEach((s) => {
-    const filtered = list.filter((t) => t.status === s)
-    filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    map[s] = filtered
-  })
-  return map
-})
-
-// 只显示有任务的状态（保持顺序）
-const visibleStatusList = computed(() => {
-  return STATUS_ORDER.filter((s) => groupedTasks.value[s].length > 0)
-})
-
 // 兼容：所有任务展平列表（用于编辑对话框等）
 const sortedTasks = computed(() => {
-  const list = taskStore.filteredTasks
+  const list = taskStore.tasks.filter(t => t.projectId === projectId)
   return [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 })
 
@@ -549,15 +550,19 @@ onUnmounted(() => {
         </div>
         <div class="info-row">
           <span class="info-label">LLM Provider</span>
-          <span class="info-value">{{ project.llmConfig?.provider ?? 'Anthropic 官方' }}</span>
+          <span class="info-value">{{ projectLlmProvider?.name || '全局默认' }}</span>
         </div>
-        <div v-if="project.llmConfig?.baseUrl" class="info-row">
+        <div v-if="projectLlmProvider" class="info-row">
+          <span class="info-label">Provider 类型</span>
+          <span class="info-value">{{ projectLlmProvider.type }}</span>
+        </div>
+        <div v-if="projectLlmProvider?.baseUrl" class="info-row">
           <span class="info-label">Base URL</span>
-          <span class="info-value mono">{{ project.llmConfig.baseUrl }}</span>
+          <span class="info-value mono">{{ projectLlmProvider.baseUrl }}</span>
         </div>
-        <div v-if="project.llmConfig?.model" class="info-row">
+        <div v-if="projectLlmProvider?.model" class="info-row">
           <span class="info-label">模型</span>
-          <span class="info-value mono">{{ project.llmConfig.model }}</span>
+          <span class="info-value mono">{{ projectLlmProvider.model }}</span>
         </div>
         <div class="info-row">
           <span class="info-label">应用访问地址</span>
@@ -589,50 +594,66 @@ onUnmounted(() => {
       <section v-show="activeTab === 'tasks'" class="tasks">
         <div class="tasks-header">
           <div class="tasks-header-actions">
-            <button class="glass-button" @click="expandAll">全部展开</button>
-            <button class="glass-button" @click="collapseAll">全部收起</button>
+            <!-- 视图模式切换 -->
+            <div class="view-toggle">
+              <button
+                class="glass-button"
+                :class="{ active: taskViewMode === 'list' }"
+                @click="setTaskViewMode('list')"
+                title="列表视图（支持树形结构）"
+              >
+                列表
+              </button>
+              <button
+                class="glass-button"
+                :class="{ active: taskViewMode === 'kanban' }"
+                @click="setTaskViewMode('kanban')"
+                title="看板视图"
+              >
+                看板
+              </button>
+            </div>
           </div>
           <button class="glass-button primary" @click="openCreateTaskDialog">+ 新建任务</button>
         </div>
 
-        <div v-if="sortedTasks.length" class="task-groups">
-          <div
-            v-for="status in visibleStatusList"
-            :key="status"
-            class="task-group"
-            :class="{ 'group-collapsed': collapsedGroups.has(status) }"
-          >
-            <button
-              class="group-header"
-              :style="{ '--group-color': STATUS_COLOR[status] }"
-              @click="toggleGroup(status)"
-            >
-              <span class="group-toggle-icon">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </span>
-              <span class="group-dot" :style="{ backgroundColor: STATUS_COLOR[status] }"></span>
-              <span class="group-label">{{ STATUS_LABEL[status] }}</span>
-              <span class="group-count">{{ groupedTasks[status].length }}</span>
-            </button>
-            <div class="group-body-wrapper">
-              <ul class="group-body task-list">
-                <TaskListItem
-                  v-for="t in groupedTasks[status]"
-                  :key="t._id"
-                  :task="t"
-                  :tick="tick"
-                  :show-priority="true"
-                  mode="compact"
-                  @navigate="handleTaskNavigate"
-                  @transition="handleTaskTransition"
-                  @edit="handleTaskEdit"
-                  @delete="deletingTaskId = $event"
-                />
-              </ul>
-            </div>
-          </div>
+        <!-- 新建任务面板 -->
+        <TaskCreatePanel
+          v-model:visible="showCreateTask"
+          :projects="project ? [project] : []"
+          :tasks="sortedTasks"
+          :default-project-id="subtaskParentId ? (taskStore.tasks.find((t) => t._id === subtaskParentId)?.projectId ?? projectId) : projectId"
+          :default-parent-task-id="subtaskParentId ?? undefined"
+          :title="subtaskParentId ? '添加子任务' : '新建任务'"
+          @submit="handleTaskCreated"
+          @cancel="showCreateTask = false; subtaskParentId = null"
+        />
+
+        <div v-if="sortedTasks.length">
+          <!-- 列表视图（支持树形结构） -->
+          <TaskTreeList
+            v-if="taskViewMode === 'list'"
+            :tasks="sortedTasks"
+            :project-name-map="projectNameMap"
+            :tick="tick"
+            mode="compact"
+            @transition="handleTaskTransition"
+            @edit="handleTaskEdit"
+            @delete="deletingTaskId = $event"
+            @add-subtask="handleAddSubtask"
+          />
+
+          <!-- 看板视图 -->
+          <KanbanBoard
+            v-else
+            :tasks="sortedTasks"
+            :project-name-map="projectNameMap"
+            :tick="tick"
+            @move="handleMoveTask"
+            @edit="handleTaskEdit"
+            @delete="deletingTaskId = $event"
+            @add-subtask="handleAddSubtask"
+          />
         </div>
         <p v-else class="empty">该项目暂无任务</p>
       </section>
@@ -771,7 +792,7 @@ onUnmounted(() => {
       :visible="showTaskDialog"
       :task="editingTask"
       :projects="project ? [project] : []"
-      :tasks="sortedTasks"
+      :tasks="taskStore.tasks"
       :mode="editingTask ? 'edit' : 'create'"
       :default-project-id="projectId"
       @submit="handleTaskDialogSubmit"
@@ -912,6 +933,23 @@ header .actions {
   align-items: center;
 }
 
+.view-toggle {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.view-toggle .glass-button {
+  min-height: 36px;
+  font-size: 0.875rem;
+  padding: var(--space-xs) var(--space-md);
+}
+
+.view-toggle .glass-button.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: transparent;
+}
+
 .task-list {
   list-style: none;
   padding: 0;
@@ -921,140 +959,18 @@ header .actions {
   gap: 0px;
 }
 
-/* ── 手风琴状态分组 ── */
-.task-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.task-group {
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  overflow: hidden;
-  transition: box-shadow var(--transition-fast);
-}
-
-.task-group:hover {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
-
-.group-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--color-text);
-  transition: background var(--transition-fast);
-  text-align: left;
-}
-
-.group-header:hover {
-  background: rgba(0, 0, 0, 0.03);
-}
-
-.group-toggle-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--transition-fast);
-  color: var(--color-text-secondary);
-}
-
-.group-collapsed .group-toggle-icon {
-  transform: rotate(-90deg);
-}
-
-.group-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.group-label {
-  flex: 1;
-}
-
-.group-count {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: rgba(0, 0, 0, 0.05);
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  min-width: 24px;
-  text-align: center;
-}
-
-.group-body-wrapper {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows var(--transition-fast) ease-out;
-}
-
-.group-collapsed .group-body-wrapper {
-  grid-template-rows: 0fr;
-}
-
-.group-body {
-  overflow: hidden;
-  padding: 0 var(--space-sm) var(--space-sm);
-}
-
-/* 手机端更紧凑的间隔 */
+/* ── 手机端更紧凑的间隔 ── */
 @media (max-width: 640px) {
-  .tasks-header {
-    margin-bottom: 1px;
+  .view-toggle .glass-button {
+    min-height: 32px;
+    font-size: 0.8125rem;
+    padding: var(--space-xs) var(--space-sm);
   }
 
-  .task-list {
-    gap: 0px;
-  }
-
-  /* 为TaskListItem添加紧凑模式类 */
-  .task-list :deep(.task-compact-item) {
-    padding: 2px 3px;
-    min-height: 20px;
-    border-radius: 0;
-  }
-
-  .task-list :deep(.task-compact-item:first-child) {
-    border-top-left-radius: var(--radius-sm);
-    border-top-right-radius: var(--radius-sm);
-  }
-
-  .task-list :deep(.task-compact-item:last-child) {
-    border-bottom: none;
-    border-bottom-left-radius: var(--radius-sm);
-    border-bottom-right-radius: var(--radius-sm);
-  }
-
-  .task-list :deep(.task-compact-item:hover) {
-    background: rgba(0, 0, 0, 0.025);
-  }
-
-  .task-list :deep(.task-compact-item .compact-title) {
-    font-size: 0.625rem;
-  }
-
-  .task-list :deep(.task-compact-item .compact-meta) {
-    font-size: 0.5rem;
-  }
-
-  .task-list :deep(.task-compact-item .compact-actions .btn-icon) {
-    min-height: 16px;
-    min-width: 16px;
-    max-width: 16px;
+  .tasks-header .glass-button.primary {
+    min-height: 32px;
+    font-size: 0.8125rem;
+    padding: var(--space-xs) var(--space-md);
   }
 }
 

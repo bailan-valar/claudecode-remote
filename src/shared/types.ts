@@ -1,5 +1,16 @@
 import type { TaskStatus, TaskPriority, TaskKind } from './constants'
 
+export interface LlmProvider {
+  id: string
+  name: string
+  type: 'anthropic' | 'zhipu' | 'kimi' | 'openai-compatible'
+  baseUrl?: string
+  apiKey?: string
+  model?: string
+  isDefault?: boolean
+  createdAt: string
+}
+
 export interface BaseDoc {
   _id: string
   _rev: string
@@ -11,6 +22,9 @@ export interface Project extends BaseDoc {
   name: string
   path: string
   description?: string
+  /** 关联的 LLM Provider ID，为空时使用全局默认 */
+  llmProviderId?: string
+  /** 已废弃：保留用于兼容旧数据，新版本使用 llmProviderId */
   llmConfig?: {
     provider: 'anthropic' | 'zhipu' | 'kimi'
     baseUrl?: string
