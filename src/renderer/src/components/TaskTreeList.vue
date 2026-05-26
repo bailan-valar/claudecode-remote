@@ -96,6 +96,10 @@ const groupedRoots = computed(() => {
 })
 
 const totalTaskCount = computed(() => props.tasks.length)
+
+function handleTransition(taskId: string, status: TaskStatus) {
+  emit('transition', taskId, status)
+}
 </script>
 
 <template>
@@ -139,7 +143,7 @@ const totalTaskCount = computed(() => props.tasks.length)
             :mode="mode"
             :expanded-ids="expandedIds"
             @toggle="toggleExpand"
-            @transition="emit('transition', $event[0], $event[1] as TaskStatus)"
+            @transition="handleTransition"
             @edit="emit('edit', $event)"
             @delete="emit('delete', $event)"
             @add-subtask="emit('addSubtask', $event)"

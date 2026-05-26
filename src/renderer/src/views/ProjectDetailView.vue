@@ -39,6 +39,32 @@ const taskViewMode = ref<'list' | 'kanban'>('list')
 const subtaskParentId = ref<string | null>(null)
 let timerId: ReturnType<typeof setInterval> | null = null
 
+// 控制是否隐藏聊天中的工具调用及结果（从本地存储读取偏好）
+const hideChatToolCalls = ref(localStorage.getItem('hideChatToolCalls') === 'true')
+
+// 监听变化，保存到本地存储
+watch(hideChatToolCalls, (newValue) => {
+  localStorage.setItem('hideChatToolCalls', String(newValue))
+})
+
+// 过滤聊天日志，隐藏工具调用和工具结果
+function filterChatLogs(logs: LogEntry[]) {
+  if (!hideChatToolCalls.value) return logs
+  return logs.filter(log => {
+    const trimmed = log.message.trim()
+    return !trimmed.startsWith('[工具]') && !trimmed.startsWith('[工具结果]')
+  })
+}
+
+// 计算被隐藏的工具调用数量
+function getHiddenChatToolCallsCount(msg: ChatMessage) {
+  if (!hideChatToolCalls.value) return 0
+  return msg.logs.filter(log => {
+    const trimmed = log.message.trim()
+    return trimmed.startsWith('[工具]') || trimmed.startsWith('[工具结果]')
+  }).length
+}
+
 // 获取项目的 LLM Provider
 const projectLlmProvider = computed(() => {
   if (!project.value) return undefined
@@ -669,6 +695,10 @@ onUnmounted(() => {
         <div class="chat-toolbar">
           <button class="glass-button" @click="clearChat">新对话</button>
           <span v-if="chatSessionId" class="session-hint">已恢复会话</span>
+          <label class="tool-call-filter">
+            <input type="checkbox" v-model="hideChatToolCalls" />
+            <span>隐藏工具调用及结果</span>
+          </label>
         </div>
         <div ref="chatContainerRef" class="chat-container glass">
           <div v-if="chatHistoryLoading" class="chat-loading">
@@ -689,7 +719,7 @@ onUnmounted(() => {
               <div v-else>
                 <div v-if="msg.status === 'streaming'" class="chat-streaming">
                   <div
-                    v-for="(log, idx) in msg.logs"
+                    v-for="(log, idx) in filterChatLogs(msg.logs)"
                     :key="idx"
                     :class="['log-line', log.level]"
                   >
@@ -697,6 +727,9 @@ onUnmounted(() => {
                     <pre class="log-msg">{{ log.message }}</pre>
                   </div>
                   <span v-if="chatLoading" class="typing-indicator">思考中…</span>
+                  <div v-if="hideChatToolCalls && getHiddenChatToolCallsCount(msg) > 0" class="hidden-hint">
+                    已隐藏 {{ getHiddenChatToolCallsCount(msg) }} 条工具调用日志
+                  </div>
                 </div>
                 <div v-else-if="msg.status === 'error'" class="chat-error">
                   {{ msg.content }}
@@ -1124,6 +1157,14 @@ header .actions {
   color: var(--color-error);
 }
 
+.chat-streaming .hidden-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-top: var(--space-xs);
+  opacity: 0.8;
+}
+
 .typing-indicator {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
@@ -1141,6 +1182,28 @@ header .actions {
 .chat-time {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+}
+
+.tool-call-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+  margin-left: auto;
+}
+
+.tool-call-filter input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+}
+
+.tool-call-filter span {
+  line-height: 1;
 }
 
 .chat-input-panel {

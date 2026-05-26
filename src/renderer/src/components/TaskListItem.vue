@@ -135,6 +135,11 @@ const emit = defineEmits<{
   addSubtask: [taskId: string]
 }>()
 
+function onStatusTransition(status: TaskStatus) {
+  emit('transition', status)
+  closeDropdown()
+}
+
 function duration() {
   void props.tick
   return calculateLiveDuration(props.task)
@@ -154,6 +159,11 @@ function onDragEnd(e: DragEvent) {
     card.classList.remove('dragging')
   }
   emit('dragend', e)
+}
+
+function onStatusTransition(status: TaskStatus) {
+  emit('transition', status)
+  closeDropdown()
 }
 </script>
 
@@ -228,7 +238,7 @@ function onDragEnd(e: DragEvent) {
             :next-states="nextStates"
             :dropdown-style="dropdownStyle"
             @edit="emit('edit', $event); closeDropdown()"
-            @transition="emit('transition', $event); closeDropdown()"
+            @transition="onStatusTransition"
             @add-subtask="emit('addSubtask', $event); closeDropdown()"
             @delete="emit('delete', $event); closeDropdown()"
             @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
@@ -288,7 +298,7 @@ function onDragEnd(e: DragEvent) {
           :next-states="nextStates"
           :dropdown-style="dropdownStyle"
           @edit="emit('edit', $event); closeDropdown()"
-          @transition="emit('transition', $event); closeDropdown()"
+          @transition="onStatusTransition"
           @add-subtask="emit('addSubtask', $event); closeDropdown()"
           @delete="emit('delete', $event); closeDropdown()"
           @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
@@ -351,7 +361,7 @@ function onDragEnd(e: DragEvent) {
           :dropdown-style="dropdownStyle"
           compact
           @edit="emit('edit', $event); closeDropdown()"
-          @transition="emit('transition', $event); closeDropdown()"
+          @transition="onStatusTransition"
           @add-subtask="emit('addSubtask', $event); closeDropdown()"
           @delete="emit('delete', $event); closeDropdown()"
           @toggle-submenu="showStatusSubmenu = !showStatusSubmenu"
